@@ -671,7 +671,7 @@ frontend/
 │   │   │   ├── hooks/
 │   │   │   │   └── useLogin.js
 │   │   │   ├── pages/
-│   │   │   │   ├── CheckEmailPage.jsx
+│   │   │   │   ├── CheckEmailPage.jx
 │   │   │   │   ├── LoginPage.jsx
 │   │   │   │   └── VerifyPage.jsx
 │   │   │   ├── routes.jsx
