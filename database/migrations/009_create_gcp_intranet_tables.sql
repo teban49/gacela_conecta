@@ -1,0 +1,100 @@
+-- Migration: GCP_Intranet_Tables
+-- Description: Tablas para el módulo de Intranet Corporativa, Gestión Documental, Organigrama, Noticias, Manuales, Píldoras y Links.
+
+CREATE TABLE IF NOT EXISTS GCP_Intranet_Empresas (
+    Id INT AUTO_INCREMENT PRIMARY KEY,
+    Nombre VARCHAR(100) NOT NULL UNIQUE,
+    Codigo VARCHAR(50) NOT NULL UNIQUE,
+    Estado TINYINT NOT NULL DEFAULT 1,
+    FechaCreacion DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS GCP_Intranet_Areas (
+    Id INT AUTO_INCREMENT PRIMARY KEY,
+    Nombre VARCHAR(100) NOT NULL,
+    Codigo VARCHAR(50) NOT NULL,
+    Estado TINYINT NOT NULL DEFAULT 1,
+    FechaCreacion DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS GCP_Intranet_Categorias (
+    Id INT AUTO_INCREMENT PRIMARY KEY,
+    Nombre VARCHAR(100) NOT NULL,
+    Codigo VARCHAR(50) NOT NULL,
+    Estado TINYINT NOT NULL DEFAULT 1
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS GCP_Intranet_Documentos (
+    Id INT AUTO_INCREMENT PRIMARY KEY,
+    EmpresaId INT NOT NULL,
+    AreaId INT NOT NULL,
+    CategoriaId INT NOT NULL,
+    Titulo VARCHAR(200) NOT NULL,
+    CodigoDocumento VARCHAR(50),
+    Version VARCHAR(20) DEFAULT '1.0',
+    RutaArchivo VARCHAR(255) NOT NULL,
+    TipoArchivo VARCHAR(50),
+    TamanoBytes BIGINT DEFAULT 0,
+    Descripcion TEXT,
+    CreadoPorUsuarioId INT NOT NULL,
+    Estado TINYINT NOT NULL DEFAULT 1,
+    FechaCreacion DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    FechaActualizacion DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (EmpresaId) REFERENCES GCP_Intranet_Empresas(Id),
+    FOREIGN KEY (AreaId) REFERENCES GCP_Intranet_Areas(Id),
+    FOREIGN KEY (CategoriaId) REFERENCES GCP_Intranet_Categorias(Id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS GCP_Intranet_Organigrama (
+    Id INT AUTO_INCREMENT PRIMARY KEY,
+    UsuarioId INT NOT NULL UNIQUE,
+    CargoNombre VARCHAR(100) NOT NULL,
+    JefeInmediatoUsuarioId INT NULL,
+    Dependencia VARCHAR(100),
+    NivelJerarquico INT DEFAULT 1,
+    Estado TINYINT NOT NULL DEFAULT 1,
+    FechaCreacion DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (UsuarioId) REFERENCES GCP_Usuarios(Id),
+    FOREIGN KEY (JefeInmediatoUsuarioId) REFERENCES GCP_Usuarios(Id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS GCP_Intranet_Noticias (
+    Id INT AUTO_INCREMENT PRIMARY KEY,
+    Titulo VARCHAR(200) NOT NULL,
+    Resumen VARCHAR(500),
+    Contenido TEXT NOT NULL,
+    ImagenUrl VARCHAR(255),
+    FechaPublicacion DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    Destacado TINYINT DEFAULT 0,
+    CreadoPorUsuarioId INT NOT NULL,
+    Estado TINYINT NOT NULL DEFAULT 1
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS GCP_Intranet_Manuales (
+    Id INT AUTO_INCREMENT PRIMARY KEY,
+    Titulo VARCHAR(200) NOT NULL,
+    Tipo VARCHAR(50) DEFAULT 'Tecnico' COMMENT 'Tecnico o Administrativo',
+    RutaArchivo VARCHAR(255) NOT NULL,
+    Version VARCHAR(20) DEFAULT '1.0',
+    CreadoPorUsuarioId INT NOT NULL,
+    Estado TINYINT NOT NULL DEFAULT 1
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS GCP_Intranet_Pildoras (
+    Id INT AUTO_INCREMENT PRIMARY KEY,
+    Titulo VARCHAR(200) NOT NULL,
+    Descripcion TEXT,
+    VideoUrl VARCHAR(255),
+    MaterialAdjuntoUrl VARCHAR(255),
+    CreadoPorUsuarioId INT NOT NULL,
+    Estado TINYINT NOT NULL DEFAULT 1
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS GCP_Intranet_Links (
+    Id INT AUTO_INCREMENT PRIMARY KEY,
+    Titulo VARCHAR(100) NOT NULL,
+    Url VARCHAR(255) NOT NULL,
+    Icono VARCHAR(50) DEFAULT 'link',
+    Orden INT DEFAULT 0,
+    Estado TINYINT NOT NULL DEFAULT 1
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
