@@ -85,6 +85,44 @@ class IntranetController
         Response::success($this->service->getOrganigrama(), 'Organigrama corporativo obtenido.');
     }
 
+    public function calidadDocumentos(): void
+    {
+        $user = Auth::user();
+        $request = new Request();
+        $companyId = (int) $request->get('EmpresaId');
+        if ($companyId < 1) {
+            Response::validationError(['EmpresaId' => ['Selecciona una empresa válida.']]);
+        }
+
+        if (!$user || !$this->service->userBelongsToCompany((int) ($user['id'] ?? 0), $companyId)) {
+            Response::forbidden('No tienes acceso a los documentos de esta empresa.');
+        }
+
+        Response::success($this->service->getCalidadDocumentos($companyId), 'Documentos de Calidad obtenidos.');
+    }
+
+    public function descargarCalidadDocumento(int $companyId, string $area, string $filename): void
+    {
+        $user = Auth::user();
+        if (!$user || !$this->service->userBelongsToCompany((int) ($user['id'] ?? 0), $companyId)) {
+            Response::forbidden('No tienes acceso a los documentos de esta empresa.');
+        }
+
+        $path = $this->service->getCalidadDocumentoPath($companyId, $area, rawurldecode($filename));
+        if ($path === null) {
+            Response::notFound('El documento no existe.');
+        }
+
+        $name = basename($path);
+        header('Content-Type: application/pdf');
+        header('Content-Length: ' . (string) filesize($path));
+        header('Content-Disposition: attachment; filename="' . addcslashes($name, "\\\"") . '"; filename*=UTF-8\'\'' . rawurlencode($name));
+        header('X-Content-Type-Options: nosniff');
+        header('Cache-Control: private, no-store');
+        readfile($path);
+        exit;
+    }
+
     public function upsertOrganigrama(): void
     {
         $data = Request::json();

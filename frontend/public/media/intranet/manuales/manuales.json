@@ -1,0 +1,62 @@
+[
+  {
+    "id": "fics-manual-taquillas",
+    "categoria": "FICS",
+    "titulo": "Manual de Usuario Taquillas",
+    "archivo": "FICS-Manual-de-Usuario-Taquillas.pdf"
+  },
+  {
+    "id": "gis-crear-incidencia",
+    "categoria": "GIS",
+    "titulo": "Crear incidencia",
+    "archivo": "Gis-.pdf"
+  },
+  {
+    "id": "gis-aceptacion-activos",
+    "categoria": "GIS",
+    "titulo": "Aceptacion de activos",
+    "archivo": "Gis-Manual-de-aceptacion-de-activos-Tecnologicos-1.pdf"
+  },
+  {
+    "id": "pxp-manual-taquillas",
+    "categoria": "PXP",
+    "titulo": "Manual de Usuario",
+    "archivo": "Manual-de-Usuario-Taquillas-PXP.pdf"
+  },
+  {
+    "id": "ofima-caja-menor",
+    "categoria": "Ofima",
+    "titulo": "Caja menor",
+    "archivo": "OFIMA-CAJA-MENOR.pdf"
+  },
+  {
+    "id": "ofima-cargue-excel",
+    "categoria": "Ofima",
+    "titulo": "Cargue archivos excel compras",
+    "archivo": "OFIMA-Cargue-archivo-excel-compras.pdf"
+  },
+  {
+    "id": "ofima-causacion-servicios",
+    "categoria": "Ofima",
+    "titulo": "Causacion servicios a propietarios GPS-WIFI",
+    "archivo": "OFIMA-CAUSACION-SERVICIOS-A-PROPIETARIOS-GPS-WIFI.pdf"
+  },
+  {
+    "id": "ofima-generacion-plano",
+    "categoria": "Ofima",
+    "titulo": "Generacion plano planilla unica",
+    "archivo": "OFIMA-Generacion-Plano-Planilla-unica.pdf"
+  },
+  {
+    "id": "ofima-procedimientos-contabilidad",
+    "categoria": "Ofima",
+    "titulo": "Procedimientos basicos contabilidad",
+    "archivo": "OFIMA-Procedimientos-Basicos-Contabilidad.pdf"
+  },
+  {
+    "id": "ofima-requisiciones",
+    "categoria": "Ofima",
+    "titulo": "Proceso de requisiciones",
+    "archivo": "OFIMA-Proceso-de-Requisiciones.pdf"
+  }
+]

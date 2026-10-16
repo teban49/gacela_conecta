@@ -120,6 +120,17 @@ npm run dev
 
 La aplicación estará disponible en `http://localhost:5173`
 
+### Contenido estático de Intranet
+
+Los archivos de capacitación y los catálogos que los muestran se mantienen en `frontend/public/media/intranet/`. Después de iniciar Vite, esos archivos se sirven desde `/media/intranet/`.
+
+- **Píldoras GIS, PXP, FICS, Ofima y Frixo:** guarda los videos en `frontend/public/media/intranet/pildoras/<plataforma>/` y registra cada video en `frontend/public/media/intranet/pildoras/videos.json`. Cada elemento usa `titulo`, `archivo` y, opcionalmente, `descripcion`; `archivo` debe ser el nombre del video dentro de la carpeta de esa plataforma.
+- **Links de aplicativos:** guarda las imágenes en `frontend/public/media/intranet/aplicativos/images/` y configura título, URL e imagen en `frontend/public/media/intranet/aplicativos/links.json`. Las imágenes actuales son `pxp_flota.png`, `pxp_expreso.png`, `pxp_rapido.png`, `fics.png`, `ams.png`, `pag_flota.png`, `micom.png`, `prosegur.png` y `sgt.png`.
+- **Manuales técnicos:** guarda los PDF en `frontend/public/media/intranet/manuales/pdf/` y agrega sus metadatos en `frontend/public/media/intranet/manuales/manuales.json` con `titulo` y `archivo`; también admite `id`, `categoria` y `version`.
+- **Documentos privados de Calidad:** guarda los PDF por empresa y opción en `backend/storage/intranet/calidad/{EmpresaId}/{opcion}/`. Al consultar Calidad se crean las nueve carpetas de la empresa afiliada seleccionada. Usa `vinculaciones`, `mantenimiento`, `torre-control`, `calidad`, `tecnologia`, `gerencia`, `servicio-cliente`, `gestion-humana` y `compras-proveedores` como nombres de carpeta. El ID debe ser el de `gcp_empresas`; estos documentos se entregan desde un endpoint autenticado y no deben moverse a `frontend/public`.
+
+Los catálogos JSON permiten agregar videos, aplicaciones o manuales sin modificar componentes React. Evita guardar archivos secretos en `public`, ya que todo su contenido es accesible desde el navegador.
+
 ## Flujo de Autenticación (Magic Links)
 
 ### 1. Solicitud de Magic Link

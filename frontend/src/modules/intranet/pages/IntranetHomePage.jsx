@@ -1,15 +1,63 @@
 import React, { useEffect, useState } from 'react';
+import { useParams } from 'react-router-dom';
 import { Newspaper, FileText, Network, BookOpen, Video, ExternalLink, Plus, Search, Filter, Upload, Download, History, X, Building2, Layers, Users } from 'lucide-react';
 import { intranetAPI } from '../../../services/intranetAPI';
 import DirectoryPage from './DirectoryPage';
 import { useAuth } from '../../../contexts/AuthContext';
 
+const platformNames = ['GIS', 'PXP', 'FICS', 'Ofima', 'Frixo'];
+const manualCategories = ['Todos', 'GIS', 'FICS', 'PXP', 'Ofima'];
+const qualityAreas = [
+  { id: 'vinculaciones', label: 'Vinculaciones' },
+  { id: 'mantenimiento', label: 'Mantenimiento' },
+  { id: 'torre-control', label: 'Torre de control' },
+  { id: 'calidad', label: 'Calidad' },
+  { id: 'tecnologia', label: 'Tecnología' },
+  { id: 'gerencia', label: 'Gerencia' },
+  { id: 'servicio-cliente', label: 'Servicio al cliente' },
+  { id: 'gestion-humana', label: 'Gestión humana' },
+  { id: 'compras-proveedores', label: 'Compras y proveedores' },
+];
+const mediaPaths = {
+  pildoras: '/media/intranet/pildoras/videos.json',
+  manuales: '/media/intranet/manuales/manuales.json',
+  links: '/media/intranet/aplicativos/links.json',
+};
+const routeTabs = {
+  calidad: 'calidad',
+  documentacion: 'documentacion',
+  directorio: 'directorio',
+  organigrama: 'organigrama',
+  manuales: 'manuales',
+  pildoras: 'pildoras',
+  linksaplicativos: 'links',
+  links: 'links',
+};
+
+const loadMediaCatalog = async (path) => {
+  const response = await fetch(path);
+  if (!response.ok) {
+    throw new Error(`No se pudo cargar el catálogo (${response.status}).`);
+  }
+  return response.json();
+};
+
 export const IntranetHomePage = () => {
-  const { hasPermission } = useAuth();
+  const { tab } = useParams();
+  const { hasPermission, user } = useAuth();
   const canManageDocuments = hasPermission('intranet.administrar_documentos');
   const canManageNews = hasPermission('intranet.administrar_noticias');
-  const [activeTab, setActiveTab] = useState('noticias');
+  const [activeTab, setActiveTab] = useState(() => routeTabs[tab?.toLowerCase()] ?? 'noticias');
+  const [activePillPlatform, setActivePillPlatform] = useState(platformNames[0]);
+  const [activeManualCategory, setActiveManualCategory] = useState('Todos');
+  const [selectedQualityCompany, setSelectedQualityCompany] = useState('');
+  const [selectedQualityArea, setSelectedQualityArea] = useState('');
+  const [qualityDocuments, setQualityDocuments] = useState([]);
+  const [qualityDocumentsLoading, setQualityDocumentsLoading] = useState(false);
+  const [qualityDocumentsError, setQualityDocumentsError] = useState('');
   const [loading, setLoading] = useState(true);
+  const [mediaCatalog, setMediaCatalog] = useState({ pildoras: {}, manuales: [], links: [] });
+  const [mediaError, setMediaError] = useState('');
   const [homeData, setHomeData] = useState({
     empresas: [],
     areas: [],
@@ -22,6 +70,8 @@ export const IntranetHomePage = () => {
 
   const [documentos, setDocumentos] = useState([]);
   const [organigrama, setOrganigrama] = useState([]);
+  const [organigramaLoading, setOrganigramaLoading] = useState(false);
+  const [organigramaError, setOrganigramaError] = useState('');
 
   // Filter state for Documentos / Calidad
   const [selectedEmpresa, setSelectedEmpresa] = useState('');
@@ -64,12 +114,84 @@ export const IntranetHomePage = () => {
   }, []);
 
   useEffect(() => {
-    if (activeTab === 'documentacion' || activeTab === 'calidad') {
+    if (activeTab === 'documentacion') {
       fetchDocumentos();
-    } else if (activeTab === 'organigrama') {
-      fetchOrganigrama();
     }
   }, [activeTab, selectedEmpresa, selectedArea, selectedCategoria, searchTerm]);
+
+  useEffect(() => {
+    const companies = user?.organization?.Empresas ?? [];
+    if (companies.length === 1) {
+      setSelectedQualityCompany(String(companies[0].Id));
+    } else if (!companies.some((company) => String(company.Id) === selectedQualityCompany)) {
+      setSelectedQualityCompany('');
+    }
+  }, [user]);
+
+  useEffect(() => {
+    if (activeTab !== 'calidad' || !selectedQualityCompany) {
+      setQualityDocuments([]);
+      setQualityDocumentsError('');
+      setQualityDocumentsLoading(false);
+      return undefined;
+    }
+
+    let cancelled = false;
+    setQualityDocumentsLoading(true);
+    setQualityDocumentsError('');
+    intranetAPI.getCalidadDocumentos(selectedQualityCompany)
+      .then((response) => {
+        if (!cancelled && response.data?.success) {
+          setQualityDocuments(response.data.data ?? []);
+        }
+      })
+      .catch((error) => {
+        if (!cancelled) {
+          setQualityDocumentsError(error.response?.data?.message || 'No fue posible cargar los documentos de Calidad.');
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setQualityDocumentsLoading(false);
+      });
+
+    return () => { cancelled = true; };
+  }, [activeTab, selectedQualityCompany]);
+
+  useEffect(() => {
+    if (activeTab === 'organigrama') fetchOrganigrama();
+  }, [activeTab]);
+
+  useEffect(() => {
+    const path = mediaPaths[activeTab];
+    if (!path) return;
+    let cancelled = false;
+    setMediaError('');
+    loadMediaCatalog(path)
+      .then((catalog) => {
+        if (cancelled) return;
+        if (activeTab === 'pildoras') {
+          if (!catalog || platformNames.some((platform) => !Array.isArray(catalog[platform]))) {
+            throw new Error('El catálogo de píldoras debe incluir una lista por plataforma.');
+          }
+          setMediaCatalog((current) => ({ ...current, pildoras: catalog }));
+        } else {
+          if (!Array.isArray(catalog)) throw new Error('El catálogo tiene un formato inválido.');
+          const requiredFields = activeTab === 'manuales' ? ['titulo', 'archivo'] : ['id', 'titulo', 'url', 'imagen'];
+          if (catalog.some((item) => requiredFields.some((field) => typeof item[field] !== 'string' || item[field].trim() === ''))) {
+            throw new Error('El catálogo contiene un elemento sin los campos requeridos.');
+          }
+          setMediaCatalog((current) => ({ ...current, [activeTab]: catalog }));
+        }
+      })
+      .catch((error) => {
+        if (!cancelled) setMediaError(error.message || 'No fue posible cargar el contenido.');
+      });
+    return () => { cancelled = true; };
+  }, [activeTab]);
+
+  useEffect(() => {
+    if (tab) setActiveTab(routeTabs[tab.toLowerCase()] ?? 'noticias');
+  }, [tab]);
 
   const fetchInitialData = async () => {
     try {
@@ -103,13 +225,17 @@ export const IntranetHomePage = () => {
   };
 
   const fetchOrganigrama = async () => {
+    setOrganigramaLoading(true);
+    setOrganigramaError('');
     try {
       const res = await intranetAPI.getOrganigrama();
       if (res.data?.success) {
         setOrganigrama(res.data.data);
       }
     } catch (err) {
-      console.error('Error cargando organigrama:', err);
+      setOrganigramaError(err.response?.data?.message || 'No fue posible cargar el organigrama.');
+    } finally {
+      setOrganigramaLoading(false);
     }
   };
 
@@ -152,6 +278,43 @@ export const IntranetHomePage = () => {
       alert(err.response?.data?.message || 'Error actualizando versión');
     }
   };
+
+  const handleDownloadQualityDocument = async (document) => {
+    try {
+      const response = await intranetAPI.descargarCalidadDocumento(
+        selectedQualityCompany,
+        document.area,
+        document.archivo,
+      );
+      const downloadUrl = URL.createObjectURL(response.data);
+      const anchor = window.document.createElement('a');
+      anchor.href = downloadUrl;
+      anchor.download = document.archivo;
+      window.document.body.appendChild(anchor);
+      anchor.click();
+      anchor.remove();
+      window.setTimeout(() => URL.revokeObjectURL(downloadUrl), 1000);
+    } catch (error) {
+      setQualityDocumentsError(error.response?.data?.message || 'No fue posible descargar el documento.');
+    }
+  };
+
+  const visibleManuals = [
+    ...(homeData.manuales ?? []).map((manual) => ({
+      id: `documento-${manual.Id}`,
+      titulo: manual.Titulo || manual.Nombre,
+      tipo: manual.CategoriaNombre || manual.Tipo,
+      version: manual.Version,
+      url: manual.RutaArchivo,
+    })),
+    ...mediaCatalog.manuales.map((manual, index) => ({
+      id: `pdf-${manual.id ?? index}`,
+      titulo: manual.titulo,
+      tipo: manual.categoria || 'Manual técnico',
+      version: manual.version,
+      url: `/media/intranet/manuales/pdf/${encodeURIComponent(manual.archivo)}`,
+    })),
+  ].filter((manual) => activeManualCategory === 'Todos' || manual.tipo === activeManualCategory);
 
   if (loading) {
     return (
@@ -256,7 +419,114 @@ export const IntranetHomePage = () => {
       {activeTab === 'directorio' && <DirectoryPage embedded />}
 
       {/* Tab: Calidad & Documentacion */}
-      {(activeTab === 'calidad' || activeTab === 'documentacion') && (
+      {activeTab === 'calidad' && (
+        <section className="space-y-5">
+          <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
+            <div className="flex items-center gap-3">
+              <Building2 className="text-orange-600" size={22} />
+              <div>
+                <h2 className="text-lg font-bold text-slate-900">Documentos de Calidad</h2>
+                <p className="text-sm text-slate-500">Consulta los documentos disponibles para tus empresas.</p>
+              </div>
+            </div>
+            {(user?.organization?.Empresas ?? []).length > 1 && (
+              <div className="mt-5 max-w-xl">
+                <label htmlFor="quality-company" className="mb-1 block text-xs font-semibold text-slate-500">Selecciona una empresa</label>
+                <select
+                  id="quality-company"
+                  value={selectedQualityCompany}
+                  onChange={(event) => {
+                    setSelectedQualityCompany(event.target.value);
+                    setSelectedQualityArea('');
+                  }}
+                  className="w-full rounded-xl border border-slate-300 px-3 py-2.5 text-sm focus:border-orange-500 focus:outline-none"
+                >
+                  <option value="">Selecciona una empresa</option>
+                  {user.organization.Empresas.map((company) => (
+                    <option key={company.Id} value={company.Id}>{company.Nombre}</option>
+                  ))}
+                </select>
+              </div>
+            )}
+            {(user?.organization?.Empresas ?? []).length === 1 && (
+              <p className="mt-4 text-sm font-semibold text-slate-700">
+                Empresa: {user.organization.Empresas[0].Nombre}
+              </p>
+            )}
+            {(user?.organization?.Empresas ?? []).length === 0 && (
+              <p role="alert" className="mt-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+                Tu usuario no tiene empresas afiliadas para consultar documentos.
+              </p>
+            )}
+          </div>
+
+          {selectedQualityCompany && (
+            <>
+              <div className="flex flex-wrap gap-2">
+                {qualityAreas.map((area) => (
+                  <button
+                    key={area.id}
+                    type="button"
+                    onClick={() => setSelectedQualityArea(area.id)}
+                    className={`rounded-full px-5 py-2.5 text-sm font-bold transition ${
+                      selectedQualityArea === area.id
+                        ? 'bg-orange-600 text-white shadow-sm'
+                        : 'bg-white text-slate-700 hover:bg-orange-50'
+                    }`}
+                  >
+                    {area.label}
+                  </button>
+                ))}
+              </div>
+              {qualityDocumentsError && (
+                <div role="alert" className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                  {qualityDocumentsError}
+                </div>
+              )}
+              {qualityDocumentsLoading ? (
+                <div className="rounded-3xl border border-slate-200 bg-white p-8 text-center text-sm text-slate-500">
+                  Cargando documentos...
+                </div>
+              ) : selectedQualityArea ? (
+                <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                  {qualityDocuments
+                    .filter((document) => document.area === selectedQualityArea)
+                    .map((document) => (
+                      <div key={`${document.area}/${document.archivo}`} className="flex items-center justify-between gap-4 rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
+                        <div className="flex min-w-0 items-center gap-3">
+                          <FileText className="shrink-0 text-orange-600" size={22} />
+                          <div className="min-w-0">
+                            <span className="text-xs font-bold text-blue-600">{document.areaNombre}</span>
+                            <h3 className="break-words font-bold text-slate-800">{document.titulo}</h3>
+                          </div>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => handleDownloadQualityDocument(document)}
+                          className="inline-flex shrink-0 items-center gap-2 rounded-xl bg-slate-900 px-4 py-2.5 text-xs font-semibold text-white hover:bg-slate-800"
+                        >
+                          <Download size={14} />
+                          Descargar
+                        </button>
+                      </div>
+                    ))}
+                  {!qualityDocuments.some((document) => document.area === selectedQualityArea) && (
+                    <p className="col-span-full rounded-2xl border border-dashed border-slate-300 bg-white p-8 text-center text-sm text-slate-500">
+                      No hay documentos para esta opción. Coloca los PDF en <code>backend/storage/intranet/calidad/{selectedQualityCompany}/{selectedQualityArea}/</code>.
+                    </p>
+                  )}
+                </div>
+              ) : (
+                <p className="rounded-2xl border border-dashed border-slate-300 bg-white p-8 text-center text-sm text-slate-500">
+                  Selecciona una opción para consultar sus documentos.
+                </p>
+              )}
+            </>
+          )}
+        </section>
+      )}
+
+      {activeTab === 'documentacion' && (
         <div className="space-y-6">
           {/* Filters Bar */}
           <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm space-y-4">
@@ -406,8 +676,16 @@ export const IntranetHomePage = () => {
             </div>
           </div>
 
+          {organigramaError && (
+            <div role="alert" className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+              {organigramaError}
+            </div>
+          )}
+
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {organigrama.length === 0 ? (
+            {organigramaLoading ? (
+              <div className="col-span-full p-8 text-center text-slate-500">Cargando organigrama...</div>
+            ) : organigrama.length === 0 ? (
               <div className="col-span-full p-8 text-center text-slate-500">
                 No hay registros cargados en el organigrama.
               </div>
@@ -434,45 +712,144 @@ export const IntranetHomePage = () => {
         </div>
       )}
 
+      {activeTab === 'pildoras' && (
+        <section className="space-y-5">
+          <div className="flex flex-wrap gap-2">
+            {platformNames.map((platform) => (
+              <button
+                key={platform}
+                type="button"
+                onClick={() => setActivePillPlatform(platform)}
+                className={`rounded-full px-5 py-2.5 text-sm font-bold transition ${
+                  activePillPlatform === platform
+                    ? 'bg-orange-600 text-white shadow-sm'
+                    : 'bg-white text-slate-700 hover:bg-orange-50'
+                }`}
+              >
+                {platform}
+              </button>
+            ))}
+          </div>
+          {mediaError && (
+            <div role="alert" className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+              {mediaError}
+            </div>
+          )}
+          {(mediaCatalog.pildoras?.[activePillPlatform] ?? []).length > 0 ? (
+            <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
+              {mediaCatalog.pildoras[activePillPlatform].map((video, index) => (
+                <article key={`${video.archivo}-${index}`} className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+                  <video controls preload="metadata" className="aspect-video w-full bg-slate-950">
+                    <source
+                      src={`/media/intranet/pildoras/${activePillPlatform}/${encodeURIComponent(video.archivo)}`}
+                    />
+                    Tu navegador no admite la reproducción de video.
+                  </video>
+                  <div className="space-y-1 p-4">
+                    <h3 className="font-bold text-slate-800">{video.titulo}</h3>
+                    {video.descripcion && <p className="text-sm text-slate-600">{video.descripcion}</p>}
+                  </div>
+                </article>
+              ))}
+            </div>
+          ) : (
+            !mediaError && (
+              <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-8 text-center">
+                <Video size={28} className="mx-auto mb-3 text-slate-400" />
+                <h3 className="font-semibold text-slate-800">Aún no hay videos de {activePillPlatform}</h3>
+                <p className="mt-1 text-sm text-slate-500">
+                  Guarda los archivos en <code>frontend/public/media/intranet/pildoras/{activePillPlatform}/</code> y agrégalos al catálogo videos.json.
+                </p>
+              </div>
+            )
+          )}
+        </section>
+      )}
+
       {/* Tab: Manuales */}
       {activeTab === 'manuales' && (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {homeData.manuales.map((man) => (
-            <div key={man.Id} className="p-5 rounded-3xl border border-slate-200 bg-white shadow-sm flex items-center justify-between">
+        <section className="space-y-4">
+          <div className="flex flex-wrap gap-2">
+            {manualCategories.map((category) => (
+              <button
+                key={category}
+                type="button"
+                onClick={() => setActiveManualCategory(category)}
+                className={`rounded-full px-5 py-2.5 text-sm font-bold transition ${
+                  activeManualCategory === category
+                    ? 'bg-orange-600 text-white shadow-sm'
+                    : 'bg-white text-slate-700 hover:bg-orange-50'
+                }`}
+              >
+                {category}
+              </button>
+            ))}
+          </div>
+          {mediaError && (
+            <div role="alert" className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+              {mediaError}
+            </div>
+          )}
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+          {visibleManuals.map((manual) => (
+            <div key={manual.id} className="flex items-center justify-between rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
               <div className="space-y-1">
-                <span className="text-xs font-bold text-blue-600 bg-blue-50 px-2.5 py-0.5 rounded-full">{man.Tipo}</span>
-                <h4 className="text-lg font-bold text-slate-800">{man.Titulo}</h4>
-                <p className="text-xs text-slate-400">Versión: {man.Version}</p>
+                <span className="rounded-full bg-blue-50 px-2.5 py-0.5 text-xs font-bold text-blue-600">{manual.tipo}</span>
+                <h4 className="text-lg font-bold text-slate-800">{manual.titulo}</h4>
+                {manual.version && <p className="text-xs text-slate-400">Versión: {manual.version}</p>}
               </div>
-              <a href={man.RutaArchivo} target="_blank" rel="noreferrer" className="px-4 py-2 bg-slate-900 text-white rounded-xl text-xs font-semibold hover:bg-slate-800">
+              <a href={manual.url} target="_blank" rel="noreferrer" className="rounded-xl bg-slate-900 px-4 py-2 text-xs font-semibold text-white hover:bg-slate-800">
                 Ver Manual
               </a>
             </div>
           ))}
-        </div>
+          </div>
+          {visibleManuals.length === 0 && !mediaError && (
+            <p className="rounded-2xl border border-dashed border-slate-300 bg-white p-8 text-center text-sm text-slate-500">
+              No hay manuales en esta categoría. Agrega los PDF en <code>frontend/public/media/intranet/manuales/pdf/</code> y regístralos en manuales.json.
+            </p>
+          )}
+        </section>
       )}
 
       {/* Tab: Links */}
       {activeTab === 'links' && (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {homeData.links.map((link) => (
+        <section className="space-y-4">
+          {mediaError && (
+            <div role="alert" className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+              {mediaError}
+            </div>
+          )}
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {mediaCatalog.links.map((link) => (
             <a
-              key={link.Id}
-              href={link.Url}
+              key={link.id}
+              href={link.url}
               target="_blank"
-              rel="noreferrer"
-              className="p-5 rounded-3xl border border-slate-200 bg-white shadow-sm hover:border-orange-500 hover:shadow-md transition flex items-center justify-between"
+              rel="noopener noreferrer"
+              className="group overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm transition hover:border-orange-500 hover:shadow-md"
             >
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-2xl bg-orange-100 text-orange-600 flex items-center justify-center font-bold">
-                  🔗
-                </div>
-                <span className="font-bold text-slate-800">{link.Titulo}</span>
+              <div className="flex h-48 items-center justify-center bg-slate-50 p-3">
+                <img
+                  src={`/media/intranet/aplicativos/${link.imagen}`}
+                  alt={link.titulo}
+                  className="h-full w-full object-contain transition-transform duration-300 group-hover:scale-105"
+                  onError={(event) => {
+                    event.currentTarget.style.visibility = 'hidden';
+                  }}
+                />
               </div>
-              <ExternalLink size={16} className="text-slate-400" />
+              <div className="flex items-center justify-between px-5 py-4">
+                <span className="font-bold text-slate-800">{link.titulo}</span>
+                <ExternalLink size={16} className="text-slate-400 transition group-hover:text-orange-600" />
+              </div>
             </a>
           ))}
-        </div>
+          </div>
+          <p className="text-center text-xs text-slate-500">
+            Para agregar aplicaciones, coloca sus imágenes en <code>frontend/public/media/intranet/aplicativos/images/</code> y edita links.json.
+          </p>
+        </section>
       )}
 
       {/* Modal Cargar Documento */}

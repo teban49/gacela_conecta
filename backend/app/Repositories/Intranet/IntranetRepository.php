@@ -62,6 +62,20 @@ class IntranetRepository extends BaseRepository
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
     }
 
+    public function userBelongsToCompany(int $userId, int $companyId): bool
+    {
+        $stmt = $this->db->prepare("
+            SELECT 1
+            FROM gcp_usuariosempresas ue
+            INNER JOIN gcp_empresas e ON e.Id = ue.EmpresaId
+            WHERE ue.UsuarioId = :userId AND ue.EmpresaId = :companyId AND e.Estado = 1
+            LIMIT 1
+        ");
+        $stmt->execute([':userId' => $userId, ':companyId' => $companyId]);
+
+        return (bool) $stmt->fetchColumn();
+    }
+
     public function getAreas(): array
     {
         $stmt = $this->db->prepare("SELECT * FROM gcp_areas WHERE Estado = 1 ORDER BY Nombre ASC");

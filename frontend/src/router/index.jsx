@@ -105,6 +105,14 @@ const router = createBrowserRouter([
         ),
       },
       {
+        path: '/intranet/:tab',
+        element: (
+          <PermissionRoute requiredPermission="intranet.ver">
+            <IntranetHomePage />
+          </PermissionRoute>
+        ),
+      },
+      {
         path: '/security',
         element: (
           <PermissionRoute requiredPermission="seguridad.ver">

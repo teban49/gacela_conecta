@@ -182,6 +182,21 @@ class User
     
     $stmt->execute(['userId' => $userId]);
     
-    return $stmt->fetch() ?: [];
+    $organization = $stmt->fetch(PDO::FETCH_ASSOC);
+    if (!$organization) {
+        return [];
+    }
+
+    $companiesStmt = $this->db->prepare("
+        SELECT e.Id, e.Nombre
+        FROM gcp_usuariosempresas ue
+        INNER JOIN gcp_empresas e ON e.Id = ue.EmpresaId
+        WHERE ue.UsuarioId = :userId AND e.Estado = 1
+        ORDER BY e.Nombre ASC
+    ");
+    $companiesStmt->execute(['userId' => $userId]);
+    $organization['Empresas'] = $companiesStmt->fetchAll(PDO::FETCH_ASSOC);
+
+    return $organization;
     }
 }

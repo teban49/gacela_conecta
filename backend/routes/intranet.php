@@ -16,6 +16,21 @@ Router::get('/api/v1/intranet/directorio', function () {
     $controller->directorio();
 }, ['jwt', 'intranet.ver']);
 
+Router::get('/api/v1/intranet/organigrama', function () {
+    $controller = new IntranetController();
+    $controller->organigrama();
+}, ['jwt', 'intranet.ver']);
+
+Router::get('/api/v1/intranet/calidad/documentos', function () {
+    $controller = new IntranetController();
+    $controller->calidadDocumentos();
+}, ['jwt', 'intranet.ver']);
+
+Router::get('/api/v1/intranet/calidad/empresas/{companyId}/{area}/{filename}', function (int $companyId, string $area, string $filename) {
+    $controller = new IntranetController();
+    $controller->descargarCalidadDocumento($companyId, $area, $filename);
+}, ['jwt', 'intranet.ver']);
+
 Router::put('/api/v1/intranet/directorio/{id}', function (int $id) {
     $controller = new IntranetController();
     $controller->updateDirectorio($id);

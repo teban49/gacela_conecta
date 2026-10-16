@@ -1,0 +1,56 @@
+[
+  {
+    "id": "pxp_flota",
+    "titulo": "PXP Flota",
+    "url": "http://flot.pxp.sisorgcloud.com/",
+    "imagen": "images/pxp_flota.png"
+  },
+  {
+    "id": "pxp_expreso",
+    "titulo": "PXP Expreso",
+    "url": "http://pazr.pxp.sisorgcloud.com/",
+    "imagen": "images/pxp_expreso.png"
+  },
+  {
+    "id": "pxp_rapido",
+    "titulo": "PXP Rápido",
+    "url": "https://duit.pxp.sisorgcloud.com/",
+    "imagen": "images/pxp_rapido.png"
+  },
+  {
+    "id": "fics",
+    "titulo": "FICS",
+    "url": "http://flot.fics.sisorgcloud.com/",
+    "imagen": "images/fics.png"
+  },
+  {
+    "id": "ams",
+    "titulo": "AMS",
+    "url": "https://flot.ams.sisorgcloud.com/Default.aspx",
+    "imagen": "images/ams.png"
+  },
+  {
+    "id": "pag_flota",
+    "titulo": "PAG Flota",
+    "url": "https://www.flotamagdalena.com/",
+    "imagen": "images/pag_flota.png"
+  },
+  {
+    "id": "micom",
+    "titulo": "MiCom",
+    "url": "https://webmail.mi.com.co/",
+    "imagen": "images/micom.png"
+  },
+  {
+    "id": "prosegur",
+    "titulo": "Prosegur",
+    "url": "https://prosegur-co.gpsmobile.net/",
+    "imagen": "images/prosegur.png"
+  },
+  {
+    "id": "sgt",
+    "titulo": "SGT",
+    "url": "https://informationserver.flotamagdalena.com/",
+    "imagen": "images/sgt.png"
+  }
+]
