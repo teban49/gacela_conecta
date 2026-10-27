@@ -38,7 +38,7 @@ class AuthController
         $ip = $this->request->getIp();
         $userAgent = $this->request->getUserAgent();
 
-        $result = $this->authService->requestMagicLink($email, $ip, $userAgent);
+        $result = $this->authService->requestMagicLink($email, $ip, $userAgent, $this->request->getHeader('Origin'));
 
         if ($result['success']) {
             Response::success(null, $result['message']);

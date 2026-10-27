@@ -31,6 +31,16 @@ Router::get('/api/v1/intranet/calidad/empresas/{companyId}/{area}/{filename}', f
     $controller->descargarCalidadDocumento($companyId, $area, $filename);
 }, ['jwt', 'intranet.ver']);
 
+Router::post('/api/v1/intranet/calidad/empresas/{companyId}/{area}', function (int $companyId, string $area) {
+    $controller = new IntranetController();
+    $controller->uploadCalidadDocumento($companyId, $area);
+}, ['jwt', 'intranet.ver']);
+
+Router::delete('/api/v1/intranet/calidad/empresas/{companyId}/{area}/{filename}', function (int $companyId, string $area, string $filename) {
+    $controller = new IntranetController();
+    $controller->eliminarCalidadDocumento($companyId, $area, $filename);
+}, ['jwt', 'intranet.ver']);
+
 Router::put('/api/v1/intranet/directorio/{id}', function (int $id) {
     $controller = new IntranetController();
     $controller->updateDirectorio($id);
@@ -55,6 +65,11 @@ Router::get('/api/v1/intranet/noticias/category/{categoria}', function (string $
     $controller = new NoticiaController();
     $controller->byCategory($categoria);
 }, ['jwt', 'intranet.ver']);
+
+Router::get('/api/v1/intranet/noticias/imagenes/{filename}', function (string $filename) {
+    $controller = new NoticiaController();
+    $controller->image(rawurldecode($filename));
+});
 
 Router::get('/api/v1/intranet/noticias/{id}', function (int $id) {
     $controller = new NoticiaController();

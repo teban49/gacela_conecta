@@ -8,6 +8,7 @@ use App\Repositories\Intranet\DocumentoRepository;
 use App\Repositories\Intranet\NoticiaRepository;
 use App\Repositories\Intranet\OrganigramaRepository;
 use App\Repositories\Intranet\CalidadDocumentoRepository;
+use App\Helpers\UploadHelper;
 
 class IntranetService
 {
@@ -26,11 +27,7 @@ class IntranetService
 
     public function getHomeData(): array
     {
-        $noticias = (new NoticiaRepository())->getPublished();
-        foreach ($noticias as &$noticia) {
-            $noticia['ImagenUrl'] = $noticia['Imagen'];
-        }
-        unset($noticia);
+        $noticias = array_map([NoticiaService::class, 'withImageUrl'], (new NoticiaRepository())->getPublished());
 
         $manuales = (new DocumentoRepository())->getByCategory('manuales');
         foreach ($manuales as &$manual) {
@@ -141,9 +138,52 @@ class IntranetService
         return $this->calidadDocumentoRepo->getDocuments($companyId);
     }
 
-    public function getCalidadDocumentoPath(int $companyId, string $area, string $filename): ?string
+    public function getCalidadDocumentoPath(int $companyId, string $area, string $categoria, string $filename): ?string
     {
-        return $this->calidadDocumentoRepo->findDocument($companyId, $area, $filename);
+        return $this->calidadDocumentoRepo->findDocument($companyId, $area, $categoria, $filename);
+    }
+
+    public function uploadCalidadDocumento(int $companyId, string $area, string $categoria, ?array $file): array
+    {
+        $directory = $this->calidadDocumentoRepo->getUploadDirectory($companyId, $area, $categoria);
+        if ($directory === null) {
+            return ['success' => false, 'status' => 422, 'message' => 'Selecciona un área y una categoría válidas.'];
+        }
+        if (!$file || ($file['error'] ?? UPLOAD_ERR_NO_FILE) === UPLOAD_ERR_NO_FILE) {
+            return ['success' => false, 'status' => 422, 'message' => 'Selecciona el archivo PDF a subir.'];
+        }
+
+        $original = basename(str_replace('\\', '/', (string) ($file['name'] ?? '')));
+        $name = trim(preg_replace('/[^\p{L}\p{N} ._()\-]/u', '', pathinfo($original, PATHINFO_FILENAME)));
+        $name = mb_substr($name, 0, 150);
+        if ($name === '') {
+            return ['success' => false, 'status' => 422, 'message' => 'El nombre del archivo no es válido.'];
+        }
+        $name .= '.pdf';
+
+        if (is_file($directory . DIRECTORY_SEPARATOR . $name)) {
+            return ['success' => false, 'status' => 409, 'message' => 'Ya existe un documento con ese nombre. Elimínalo primero o cambia el nombre del archivo.'];
+        }
+
+        $upload = UploadHelper::store($file, $directory, UploadHelper::PDF_TYPES, 20 * 1024 * 1024, $name);
+        if (isset($upload['error'])) {
+            return ['success' => false, 'status' => 422, 'message' => $upload['error']];
+        }
+
+        return ['success' => true, 'message' => 'Documento cargado correctamente.', 'data' => ['archivo' => $name]];
+    }
+
+    public function deleteCalidadDocumento(int $companyId, string $area, string $categoria, string $filename): array
+    {
+        $path = $this->calidadDocumentoRepo->findDocument($companyId, $area, $categoria, $filename);
+        if ($path === null) {
+            return ['success' => false, 'status' => 404, 'message' => 'El documento no existe.'];
+        }
+        if (!unlink($path)) {
+            return ['success' => false, 'status' => 500, 'message' => 'No fue posible eliminar el documento.'];
+        }
+
+        return ['success' => true, 'message' => 'Documento eliminado correctamente.'];
     }
 
     public function upsertOrganigramaNodo(array $data): array

@@ -19,7 +19,7 @@ class AuthService
         $this->authTokenModel = new AuthToken();
     }
 
-    public function requestMagicLink(string $email, string $ip, string $userAgent): array
+    public function requestMagicLink(string $email, string $ip, string $userAgent, ?string $origin = null): array
     {
         // Find user by email
         $user = $this->userModel->findByEmail($email);
@@ -52,7 +52,7 @@ class AuthService
         ]);
 
         // Generate magic link URL
-        $appUrl = getenv('APP_URL') ?: ($_ENV['APP_URL'] ?? 'http://192.168.10.156:5176');
+        $appUrl = $this->resolveAppUrl($origin);
         $magicLink = "{$appUrl}/auth/verify?token={$token}";
 
         // Send email
@@ -70,6 +70,32 @@ class AuthService
             'success' => true,
             'message' => 'Si tu correo está registrado, recibirás un enlace de acceso en tu bandeja de entrada.'
         ];
+    }
+
+    /**
+     * APP_URL fija la URL pública del frontend (producción). Si está vacía, se usa el origen
+     * desde el que el usuario pidió el enlace, solo si es localhost, una IP privada o un host
+     * listado en APP_ALLOWED_HOSTS; así el enlace nunca apunta a un dominio arbitrario.
+     */
+    private function resolveAppUrl(?string $origin): string
+    {
+        $configured = trim((string) (getenv('APP_URL') ?: ($_ENV['APP_URL'] ?? '')));
+        if ($configured !== '') {
+            return rtrim($configured, '/');
+        }
+
+        $parts = $origin ? parse_url($origin) : false;
+        $host = strtolower($parts['host'] ?? '');
+        if ($host !== '' && in_array($parts['scheme'] ?? '', ['http', 'https'], true)) {
+            $allowed = array_filter(array_map('trim', explode(',', strtolower((string) (getenv('APP_ALLOWED_HOSTS') ?: ($_ENV['APP_ALLOWED_HOSTS'] ?? ''))))));
+            $isIp = filter_var($host, FILTER_VALIDATE_IP) !== false;
+            $isPrivateIp = $isIp && filter_var($host, FILTER_VALIDATE_IP, FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE) === false;
+            if ($host === 'localhost' || $isPrivateIp || in_array($host, $allowed, true)) {
+                return $parts['scheme'] . '://' . $parts['host'] . (isset($parts['port']) ? ':' . $parts['port'] : '');
+            }
+        }
+
+        return 'http://localhost:5173';
     }
 
     public function verifyToken(string $token, string $ip, string $userAgent): array

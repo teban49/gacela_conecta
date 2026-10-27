@@ -108,7 +108,12 @@ class IntranetController
             Response::forbidden('No tienes acceso a los documentos de esta empresa.');
         }
 
-        $path = $this->service->getCalidadDocumentoPath($companyId, $area, rawurldecode($filename));
+        $path = $this->service->getCalidadDocumentoPath(
+            $companyId,
+            $area,
+            is_string($_GET['Categoria'] ?? null) ? $_GET['Categoria'] : '',
+            rawurldecode($filename)
+        );
         if ($path === null) {
             Response::notFound('El documento no existe.');
         }
@@ -121,6 +126,45 @@ class IntranetController
         header('Cache-Control: private, no-store');
         readfile($path);
         exit;
+    }
+
+    public function uploadCalidadDocumento(int $companyId, string $area): void
+    {
+        $this->authorizeCalidadAdmin($companyId);
+        $categoria = is_string($_POST['Categoria'] ?? null) ? $_POST['Categoria'] : '';
+        $result = $this->service->uploadCalidadDocumento($companyId, rawurldecode($area), $categoria, $_FILES['Archivo'] ?? null);
+
+        if (!$result['success']) {
+            Response::error($result['message'], [], $result['status'] ?? 400);
+        }
+        Response::created($result['data'] ?? null, $result['message']);
+    }
+
+    public function eliminarCalidadDocumento(int $companyId, string $area, string $filename): void
+    {
+        $this->authorizeCalidadAdmin($companyId);
+        $categoria = is_string($_GET['Categoria'] ?? null) ? $_GET['Categoria'] : '';
+        $result = $this->service->deleteCalidadDocumento($companyId, rawurldecode($area), $categoria, rawurldecode($filename));
+
+        if (!$result['success']) {
+            Response::error($result['message'], [], $result['status'] ?? 400);
+        }
+        Response::success(null, $result['message']);
+    }
+
+    private function authorizeCalidadAdmin(int $companyId): void
+    {
+        $user = Auth::user();
+        $roles = array_map(
+            static fn ($role) => is_array($role) ? ($role['Codigo'] ?? '') : $role,
+            $user['roles'] ?? []
+        );
+        if (!$user || !in_array('admin', $roles, true)) {
+            Response::forbidden('Solo el administrador puede gestionar los documentos de Calidad.');
+        }
+        if (!$this->service->userBelongsToCompany((int) ($user['id'] ?? 0), $companyId)) {
+            Response::forbidden('No tienes acceso a los documentos de esta empresa.');
+        }
     }
 
     public function upsertOrganigrama(): void
