@@ -14,7 +14,7 @@ class UserRepository extends BaseRepository
         $sql = "
             SELECT u.Id, u.AgenciaId, u.CargoId, u.CargoJefeDirectoId,
                    jefeCargo.Nombre AS JefeDirectoCargoNombre,
-                   a.CiudadId, c.AreaId,
+                   a.CiudadId, c.RolId AS CargoRolId,
                    MIN(ue.EmpresaId) AS EmpresaId,
                    GROUP_CONCAT(DISTINCT ue.EmpresaId ORDER BY ue.EmpresaId) AS EmpresasIds,
                    u.Nombres, u.Apellidos, u.EmailCorporativo, u.Telefono, u.Estado,

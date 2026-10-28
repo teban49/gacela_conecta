@@ -1,9 +1,13 @@
 import React, { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
-import { Newspaper, FileText, Network, BookOpen, Video, ExternalLink, Plus, Search, Filter, Upload, Download, History, X, Building2, Layers, Users } from 'lucide-react';
+import { Newspaper, FileText, Network, BookOpen, Video, ExternalLink, Plus, Search, Filter, Upload, Download, History, X, Building2, Layers, Users, Trash2, HelpCircle } from 'lucide-react';
+import NewsFeed from '../components/NewsFeed';
+import FaqSection from '../components/FaqSection';
+import OrganigramaSection from '../components/OrganigramaSection';
 import { intranetAPI } from '../../../services/intranetAPI';
 import DirectoryPage from './DirectoryPage';
 import { useAuth } from '../../../contexts/AuthContext';
+import { canViewQualityArea } from '../../../utils/roleAccess';
 
 const platformNames = ['GIS', 'PXP', 'FICS', 'Ofima', 'Frixo'];
 const manualCategories = ['Todos', 'GIS', 'FICS', 'PXP', 'Ofima'];
@@ -18,6 +22,14 @@ const qualityAreas = [
   { id: 'gestion-humana', label: 'Gestión humana' },
   { id: 'compras-proveedores', label: 'Compras y proveedores' },
 ];
+const qualityCategories = [
+  { id: 'caracterizacion', label: 'Caracterización' },
+  { id: 'desempeño', label: 'Desempeño' },
+  { id: 'directrices', label: 'Directrices' },
+  { id: 'formatos', label: 'Formatos' },
+  { id: 'matrices', label: 'Matrices' },
+  { id: 'procedimiento', label: 'Procedimiento' },
+];
 const mediaPaths = {
   pildoras: '/media/intranet/pildoras/videos.json',
   manuales: '/media/intranet/manuales/manuales.json',
@@ -28,6 +40,8 @@ const routeTabs = {
   documentacion: 'documentacion',
   directorio: 'directorio',
   organigrama: 'organigrama',
+  'preguntas-frecuentes': 'preguntas',
+  faq: 'preguntas',
   manuales: 'manuales',
   pildoras: 'pildoras',
   linksaplicativos: 'links',
@@ -44,14 +58,23 @@ const loadMediaCatalog = async (path) => {
 
 export const IntranetHomePage = () => {
   const { tab } = useParams();
-  const { hasPermission, user } = useAuth();
+  const { hasPermission, hasRole, user } = useAuth();
   const canManageDocuments = hasPermission('intranet.administrar_documentos');
   const canManageNews = hasPermission('intranet.administrar_noticias');
+  const canManageQuality = hasRole('admin');
   const [activeTab, setActiveTab] = useState(() => routeTabs[tab?.toLowerCase()] ?? 'noticias');
   const [activePillPlatform, setActivePillPlatform] = useState(platformNames[0]);
   const [activeManualCategory, setActiveManualCategory] = useState('Todos');
   const [selectedQualityCompany, setSelectedQualityCompany] = useState('');
   const [selectedQualityArea, setSelectedQualityArea] = useState('');
+  const [selectedQualityCategory, setSelectedQualityCategory] = useState('');
+  const [qualityUploadCategory, setQualityUploadCategory] = useState(qualityCategories[0].id);
+  const [qualityUploadFile, setQualityUploadFile] = useState(null);
+  const [qualityUploading, setQualityUploading] = useState(false);
+  const [qualityMessage, setQualityMessage] = useState('');
+  const [qualityReload, setQualityReload] = useState(0);
+  const [noticiaImage, setNoticiaImage] = useState(null);
+  const [noticiaImagePreview, setNoticiaImagePreview] = useState('');
   const [qualityDocuments, setQualityDocuments] = useState([]);
   const [qualityDocumentsLoading, setQualityDocumentsLoading] = useState(false);
   const [qualityDocumentsError, setQualityDocumentsError] = useState('');
@@ -69,9 +92,6 @@ export const IntranetHomePage = () => {
   });
 
   const [documentos, setDocumentos] = useState([]);
-  const [organigrama, setOrganigrama] = useState([]);
-  const [organigramaLoading, setOrganigramaLoading] = useState(false);
-  const [organigramaError, setOrganigramaError] = useState('');
 
   // Filter state for Documentos / Calidad
   const [selectedEmpresa, setSelectedEmpresa] = useState('');
@@ -155,11 +175,7 @@ export const IntranetHomePage = () => {
       });
 
     return () => { cancelled = true; };
-  }, [activeTab, selectedQualityCompany]);
-
-  useEffect(() => {
-    if (activeTab === 'organigrama') fetchOrganigrama();
-  }, [activeTab]);
+  }, [activeTab, selectedQualityCompany, qualityReload]);
 
   useEffect(() => {
     const path = mediaPaths[activeTab];
@@ -224,21 +240,6 @@ export const IntranetHomePage = () => {
     }
   };
 
-  const fetchOrganigrama = async () => {
-    setOrganigramaLoading(true);
-    setOrganigramaError('');
-    try {
-      const res = await intranetAPI.getOrganigrama();
-      if (res.data?.success) {
-        setOrganigrama(res.data.data);
-      }
-    } catch (err) {
-      setOrganigramaError(err.response?.data?.message || 'No fue posible cargar el organigrama.');
-    } finally {
-      setOrganigramaLoading(false);
-    }
-  };
-
   const handleSaveDoc = async () => {
     try {
       const res = await intranetAPI.createDocumento(docFormData);
@@ -252,16 +253,50 @@ export const IntranetHomePage = () => {
     }
   };
 
+  const resetNoticiaForm = () => {
+    setNoticiaFormData({ Titulo: '', Resumen: '', Contenido: '', ImagenUrl: '', Destacado: false });
+    setNoticiaImage(null);
+  };
+
+  const handleNoticiaImageChange = (event) => {
+    const file = event.target.files?.[0] ?? null;
+    setNoticiaImage(file);
+  };
+
+  useEffect(() => {
+    if (!noticiaImage) {
+      setNoticiaImagePreview('');
+      return undefined;
+    }
+    const url = URL.createObjectURL(noticiaImage);
+    setNoticiaImagePreview(url);
+    return () => URL.revokeObjectURL(url);
+  }, [noticiaImage]);
+
   const handleSaveNoticia = async () => {
+    if (!noticiaFormData.Titulo.trim() || !noticiaFormData.Contenido.trim()) {
+      alert('El título y el contenido son obligatorios.');
+      return;
+    }
+    const body = new FormData();
+    body.append('Titulo', noticiaFormData.Titulo.trim());
+    body.append('Resumen', noticiaFormData.Resumen.trim());
+    body.append('Contenido', noticiaFormData.Contenido.trim());
+    body.append('Estado', 'publicada');
+    if (noticiaImage) body.append('Imagen', noticiaImage);
+
     try {
-      const res = await intranetAPI.createNoticia(noticiaFormData);
+      const res = await intranetAPI.createNoticia(body);
       if (res.data?.success) {
         alert(res.data.message || 'Noticia publicada');
         setShowNoticiaModal(false);
+        resetNoticiaForm();
         fetchInitialData();
       }
     } catch (err) {
-      alert(err.response?.data?.message || 'Error publicando noticia');
+      const fieldErrors = Object.values(err.response?.data?.errors ?? {}).flat().join(' ');
+      if (err.response?.status !== 422) alert(err.response?.data?.message || 'Error publicando noticia');
+      else if (!fieldErrors) alert('Revisa los datos de la noticia.');
     }
   };
 
@@ -285,6 +320,7 @@ export const IntranetHomePage = () => {
         selectedQualityCompany,
         document.area,
         document.archivo,
+        document.categoria,
       );
       const downloadUrl = URL.createObjectURL(response.data);
       const anchor = window.document.createElement('a');
@@ -296,6 +332,48 @@ export const IntranetHomePage = () => {
       window.setTimeout(() => URL.revokeObjectURL(downloadUrl), 1000);
     } catch (error) {
       setQualityDocumentsError(error.response?.data?.message || 'No fue posible descargar el documento.');
+    }
+  };
+
+  const handleUploadQualityDocument = async (event) => {
+    event.preventDefault();
+    if (!qualityUploadFile || !selectedQualityArea) return;
+    setQualityUploading(true);
+    setQualityDocumentsError('');
+    setQualityMessage('');
+    try {
+      const response = await intranetAPI.subirCalidadDocumento(
+        selectedQualityCompany,
+        selectedQualityArea,
+        qualityUploadCategory,
+        qualityUploadFile,
+      );
+      setQualityMessage(response.data?.message || 'Documento cargado correctamente.');
+      setQualityUploadFile(null);
+      event.target.reset();
+      setQualityReload((value) => value + 1);
+    } catch (error) {
+      setQualityDocumentsError(error.response?.data?.message || 'No fue posible subir el documento.');
+    } finally {
+      setQualityUploading(false);
+    }
+  };
+
+  const handleDeleteQualityDocument = async (document) => {
+    if (!window.confirm(`¿Eliminar definitivamente "${document.titulo}"?`)) return;
+    setQualityDocumentsError('');
+    setQualityMessage('');
+    try {
+      const response = await intranetAPI.eliminarCalidadDocumento(
+        selectedQualityCompany,
+        document.area,
+        document.archivo,
+        document.categoria,
+      );
+      setQualityMessage(response.data?.message || 'Documento eliminado correctamente.');
+      setQualityReload((value) => value + 1);
+    } catch (error) {
+      setQualityDocumentsError(error.response?.data?.message || 'No fue posible eliminar el documento.');
     }
   };
 
@@ -360,12 +438,12 @@ export const IntranetHomePage = () => {
           {[
             { id: 'noticias', label: 'Noticias & Comunicados', icon: Newspaper },
             { id: 'calidad', label: 'Gestión de Calidad', icon: FileText },
-            { id: 'documentacion', label: 'Repositorio Documental', icon: Layers },
             { id: 'directorio', label: 'Directorio', icon: Users },
             { id: 'organigrama', label: 'Organigrama Corporativo', icon: Network },
             { id: 'manuales', label: 'Manuales Técnicos', icon: BookOpen },
             { id: 'pildoras', label: 'Píldoras Capacitación', icon: Video },
             { id: 'links', label: 'Links Aplicativos', icon: ExternalLink },
+            { id: 'preguntas', label: 'Preguntas Frecuentes', icon: HelpCircle },
           ].map((tab) => {
             const Icon = tab.icon;
             const isActive = activeTab === tab.id;
@@ -377,7 +455,7 @@ export const IntranetHomePage = () => {
                   isActive ? 'bg-orange-600 text-white shadow-sm' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
                 }`}
               >
-                <Icon size={14} />
+                <Icon size={12} />
                 {tab.label}
               </button>
             );
@@ -387,33 +465,7 @@ export const IntranetHomePage = () => {
 
       {/* Tab: Noticias */}
       {activeTab === 'noticias' && (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {homeData.noticias.length === 0 ? (
-            <div className="col-span-full p-12 text-center text-slate-500 bg-white rounded-3xl border border-slate-200">
-              No hay noticias o comunicados publicados actualmente.
-            </div>
-          ) : (
-            homeData.noticias.map((noticia) => (
-              <div key={noticia.Id} className="rounded-3xl border border-slate-200 bg-white overflow-hidden shadow-sm hover:shadow-md transition">
-                {noticia.ImagenUrl ? (
-                  <img src={noticia.ImagenUrl} alt={noticia.Titulo} className="w-full h-48 object-cover" />
-                ) : (
-                  <div className="w-full h-48 bg-gradient-to-r from-orange-500 to-amber-500 flex items-center justify-center text-white text-3xl font-bold">
-                    Grupo Gacela
-                  </div>
-                )}
-
-                <div className="p-5 space-y-2">
-                  <span className="text-xs font-semibold text-orange-600 bg-orange-50 px-2.5 py-1 rounded-full">
-                    {new Date(noticia.FechaPublicacion).toLocaleDateString()}
-                  </span>
-                  <h3 className="text-lg font-bold text-slate-900 leading-snug">{noticia.Titulo}</h3>
-                  <p className="text-sm text-slate-600 line-clamp-3">{noticia.Resumen || noticia.Contenido}</p>
-                </div>
-              </div>
-            ))
-          )}
-        </div>
+        <NewsFeed noticias={homeData.noticias} />
       )}
 
       {activeTab === 'directorio' && <DirectoryPage embedded />}
@@ -462,13 +514,16 @@ export const IntranetHomePage = () => {
 
           {selectedQualityCompany && (
             <>
-              <div className="flex flex-wrap gap-2">
-                {qualityAreas.map((area) => (
+              <div className="flex gap-2 overflow-x-auto pb-1">
+                {qualityAreas.filter((area) => canViewQualityArea(user, area.id)).map((area) => (
                   <button
                     key={area.id}
                     type="button"
-                    onClick={() => setSelectedQualityArea(area.id)}
-                    className={`rounded-full px-5 py-2.5 text-sm font-bold transition ${
+                    onClick={() => {
+                      setSelectedQualityArea(area.id);
+                      setSelectedQualityCategory('');
+                    }}
+                    className={`flex-1 whitespace-nowrap rounded-full px-3 py-2.5 text-center text-xs font-bold transition xl:text-sm ${
                       selectedQualityArea === area.id
                         ? 'bg-orange-600 text-white shadow-sm'
                         : 'bg-white text-slate-700 hover:bg-orange-50'
@@ -483,6 +538,64 @@ export const IntranetHomePage = () => {
                   {qualityDocumentsError}
                 </div>
               )}
+              {qualityMessage && (
+                <div role="status" className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
+                  {qualityMessage}
+                </div>
+              )}
+              {selectedQualityArea && canManageQuality && (
+                <form onSubmit={handleUploadQualityDocument} className="flex flex-wrap items-end gap-3 rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
+                  <div>
+                    <label htmlFor="quality-upload-category" className="mb-1 block text-xs font-semibold text-slate-500">Categoría</label>
+                    <select
+                      id="quality-upload-category"
+                      value={qualityUploadCategory}
+                      onChange={(event) => setQualityUploadCategory(event.target.value)}
+                      className="rounded-xl border border-slate-300 px-3 py-2.5 text-sm"
+                    >
+                      {qualityCategories.map((category) => (
+                        <option key={category.id} value={category.id}>{category.label}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <label htmlFor="quality-upload-file" className="mb-1 block text-xs font-semibold text-slate-500">Documento PDF (máx. 20 MB)</label>
+                    <input
+                      id="quality-upload-file"
+                      type="file"
+                      accept="application/pdf,.pdf"
+                      onChange={(event) => setQualityUploadFile(event.target.files?.[0] ?? null)}
+                      className="w-full rounded-xl border border-slate-300 p-2 text-sm"
+                    />
+                  </div>
+                  <button
+                    type="submit"
+                    disabled={!qualityUploadFile || qualityUploading}
+                    className="inline-flex items-center gap-2 rounded-xl bg-orange-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-orange-700 disabled:opacity-50"
+                  >
+                    <Upload size={16} />
+                    {qualityUploading ? 'Subiendo...' : 'Subir documento'}
+                  </button>
+                </form>
+              )}
+              {selectedQualityArea && (
+                <div className="flex flex-wrap gap-2">
+                  {[{ id: '', label: 'Todas las categorías' }, ...qualityCategories].map((category) => (
+                    <button
+                      key={category.id || 'todas'}
+                      type="button"
+                      onClick={() => setSelectedQualityCategory(category.id)}
+                      className={`rounded-full border px-4 py-1.5 text-xs font-semibold transition ${
+                        selectedQualityCategory === category.id
+                          ? 'border-slate-900 bg-slate-900 text-white'
+                          : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
+                      }`}
+                    >
+                      {category.label}
+                    </button>
+                  ))}
+                </div>
+              )}
               {qualityDocumentsLoading ? (
                 <div className="rounded-3xl border border-slate-200 bg-white p-8 text-center text-sm text-slate-500">
                   Cargando documentos...
@@ -490,29 +603,43 @@ export const IntranetHomePage = () => {
               ) : selectedQualityArea ? (
                 <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                   {qualityDocuments
-                    .filter((document) => document.area === selectedQualityArea)
+                    .filter((document) => document.area === selectedQualityArea
+                      && (!selectedQualityCategory || document.categoria === selectedQualityCategory))
                     .map((document) => (
-                      <div key={`${document.area}/${document.archivo}`} className="flex items-center justify-between gap-4 rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
+                      <div key={`${document.area}/${document.categoria}/${document.archivo}`} className="flex items-center justify-between gap-4 rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
                         <div className="flex min-w-0 items-center gap-3">
                           <FileText className="shrink-0 text-orange-600" size={22} />
                           <div className="min-w-0">
-                            <span className="text-xs font-bold text-blue-600">{document.areaNombre}</span>
+                            <span className="text-xs font-bold text-blue-600">{document.areaNombre} · {document.categoriaNombre}</span>
                             <h3 className="break-words font-bold text-slate-800">{document.titulo}</h3>
                           </div>
                         </div>
-                        <button
-                          type="button"
-                          onClick={() => handleDownloadQualityDocument(document)}
-                          className="inline-flex shrink-0 items-center gap-2 rounded-xl bg-slate-900 px-4 py-2.5 text-xs font-semibold text-white hover:bg-slate-800"
-                        >
-                          <Download size={14} />
-                          Descargar
-                        </button>
+                        <div className="flex shrink-0 items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={() => handleDownloadQualityDocument(document)}
+                            className="inline-flex items-center gap-2 rounded-xl bg-slate-900 px-4 py-2.5 text-xs font-semibold text-white hover:bg-slate-800"
+                          >
+                            <Download size={14} />
+                            Descargar
+                          </button>
+                          {canManageQuality && (
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteQualityDocument(document)}
+                              aria-label={`Eliminar ${document.titulo}`}
+                              className="inline-flex items-center rounded-xl border border-red-200 p-2.5 text-red-700 hover:bg-red-50"
+                            >
+                              <Trash2 size={14} />
+                            </button>
+                          )}
+                        </div>
                       </div>
                     ))}
-                  {!qualityDocuments.some((document) => document.area === selectedQualityArea) && (
+                  {!qualityDocuments.some((document) => document.area === selectedQualityArea
+                    && (!selectedQualityCategory || document.categoria === selectedQualityCategory)) && (
                     <p className="col-span-full rounded-2xl border border-dashed border-slate-300 bg-white p-8 text-center text-sm text-slate-500">
-                      No hay documentos para esta opción. Coloca los PDF en <code>backend/storage/intranet/calidad/{selectedQualityCompany}/{selectedQualityArea}/</code>.
+                      No hay documentos para esta opción.
                     </p>
                   )}
                 </div>
@@ -668,49 +795,10 @@ export const IntranetHomePage = () => {
 
       {/* Tab: Organigrama */}
       {activeTab === 'organigrama' && (
-        <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm space-y-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <h3 className="text-xl font-bold text-slate-900">Estructura Organizacional y Jerarquía Corporativa</h3>
-              <p className="text-sm text-slate-500">Representación de cargos, jefe inmediato y dependencias para flujos de aprobación.</p>
-            </div>
-          </div>
-
-          {organigramaError && (
-            <div role="alert" className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-              {organigramaError}
-            </div>
-          )}
-
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {organigramaLoading ? (
-              <div className="col-span-full p-8 text-center text-slate-500">Cargando organigrama...</div>
-            ) : organigrama.length === 0 ? (
-              <div className="col-span-full p-8 text-center text-slate-500">
-                No hay registros cargados en el organigrama.
-              </div>
-            ) : (
-              organigrama.map((nodo) => (
-                <div key={nodo.Id} className="p-5 rounded-2xl border border-slate-200 bg-slate-50/70 space-y-2">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold text-orange-700 bg-orange-100 px-2.5 py-0.5 rounded-full">
-                      Nivel Jerárquico {nodo.NivelJerarquico}
-                    </span>
-                    <span className="text-xs font-medium text-slate-400">{nodo.Dependencia || 'General'}</span>
-                  </div>
-                  <h4 className="text-lg font-bold text-slate-900">{nodo.UsuarioNombre}</h4>
-                  <p className="text-sm font-semibold text-slate-700">{nodo.CargoNombre}</p>
-                  {nodo.JefeNombre && (
-                    <div className="pt-2 border-t border-slate-200/60 text-xs text-slate-500 flex items-center gap-1">
-                      <span className="font-semibold text-slate-600">Jefe Inmediato:</span> {nodo.JefeNombre}
-                    </div>
-                  )}
-                </div>
-              ))
-            )}
-          </div>
-        </div>
+        <OrganigramaSection canEdit={canManageQuality} />
       )}
+
+      {activeTab === 'preguntas' && <FaqSection />}
 
       {activeTab === 'pildoras' && (
         <section className="space-y-5">
@@ -738,13 +826,24 @@ export const IntranetHomePage = () => {
           {(mediaCatalog.pildoras?.[activePillPlatform] ?? []).length > 0 ? (
             <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
               {mediaCatalog.pildoras[activePillPlatform].map((video, index) => (
-                <article key={`${video.archivo}-${index}`} className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+                <article key={`${video.archivo ?? video.titulo}-${index}`} className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+                  {video.youtube ? (
+                    <iframe
+                      title={video.titulo}
+                      loading="lazy"
+                      className="aspect-video w-full bg-slate-950"
+                      src={`https://www.youtube.com/embed/${video.youtube.video ?? 'videoseries'}?list=${video.youtube.lista ?? ''}`.replace(/\?list=$/, '')}
+                      allow="accelerometer; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen"
+                      allowFullScreen
+                    />
+                  ) : (
                   <video controls preload="metadata" className="aspect-video w-full bg-slate-950">
                     <source
                       src={`/media/intranet/pildoras/${activePillPlatform}/${encodeURIComponent(video.archivo)}`}
                     />
                     Tu navegador no admite la reproducción de video.
                   </video>
+                  )}
                   <div className="space-y-1 p-4">
                     <h3 className="font-bold text-slate-800">{video.titulo}</h3>
                     {video.descripcion && <p className="text-sm text-slate-600">{video.descripcion}</p>}
@@ -917,6 +1016,11 @@ export const IntranetHomePage = () => {
               <div>
                 <label className="text-xs font-semibold text-slate-600 mb-1 block">Contenido</label>
                 <textarea rows={4} value={noticiaFormData.Contenido} onChange={(e) => setNoticiaFormData({...noticiaFormData, Contenido: e.target.value})} className="w-full rounded-xl border border-slate-300 p-2.5 text-sm" />
+              </div>
+              <div>
+                <label htmlFor="noticia-imagen" className="text-xs font-semibold text-slate-600 mb-1 block">Imagen (JPG, PNG o WEBP, máx. 5 MB)</label>
+                <input id="noticia-imagen" type="file" accept="image/png,image/jpeg,image/webp" onChange={handleNoticiaImageChange} className="w-full rounded-xl border border-slate-300 p-2 text-sm" />
+                {noticiaImagePreview && <img src={noticiaImagePreview} alt="Vista previa" className="mt-2 h-32 w-full rounded-xl object-cover" />}
               </div>
               <button onClick={handleSaveNoticia} className="w-full py-3 bg-slate-900 text-white rounded-xl font-semibold text-sm hover:bg-slate-800">Publicar Noticia</button>
             </div>

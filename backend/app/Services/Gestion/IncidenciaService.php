@@ -2,6 +2,7 @@
 
 namespace App\Services\Gestion;
 
+use App\Repositories\Gestion\ActivoRepository;
 use App\Repositories\Solicitudes\CategoriaRepository;
 use App\Repositories\Solicitudes\SolicitudRepository;
 use App\Services\Solicitudes\SolicitudService;
@@ -71,6 +72,22 @@ class IncidenciaService
         }
 
         $data['SolicitanteId'] = $requesterId;
+
+        $ownAssets = (new ActivoRepository())->getByAssignee($requesterId);
+        if ($ownAssets) {
+            $assetId = $this->parseInteger($data['ActivoId'] ?? null);
+            $ownIds = array_map(static fn (array $asset): int => (int) $asset['Id'], $ownAssets);
+            if ($assetId === false || !in_array($assetId, $ownIds, true)) {
+                return [
+                    'success' => false,
+                    'errors' => ['ActivoId' => ['Selecciona uno de los activos asignados a tu usuario.']],
+                    'message' => 'El activo seleccionado no es válido.',
+                ];
+            }
+            $data['ActivoId'] = $assetId;
+        } else {
+            $data['ActivoId'] = null;
+        }
         $data['EmpresaId'] = $companyId;
         $data['Ubicacion'] = $context['Ubicacion'] ?: null;
         $data['Tipo'] = 'incidencia';

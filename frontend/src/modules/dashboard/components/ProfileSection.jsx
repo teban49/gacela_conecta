@@ -156,7 +156,7 @@ const ProfileSection = ({ user }) => {
 
                             <p className="font-medium">
 
-                                {organization.AreaNombre ?? "-"}
+                                {organization.RolNombre ?? "-"}
 
                             </p>
 

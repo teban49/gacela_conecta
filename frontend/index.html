@@ -5,6 +5,17 @@
     <link rel="icon" href="/public/images/favicon.ico" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Gacela Conecta</title>
+    <script>
+      (function () {
+        try {
+          var u = JSON.parse(localStorage.getItem('user_data') || 'null');
+          var id = u && (u.id || u.Id);
+          if (id && localStorage.getItem('gacela_theme_' + id) === 'dark') {
+            document.documentElement.classList.add('dark');
+          }
+        } catch (e) {}
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>

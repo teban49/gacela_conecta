@@ -303,13 +303,19 @@ class SolicitudLaboralRepository extends BaseRepository
             SELECT s.Id, s.UsuarioId, s.AprobadorCargoId, s.TipoId, s.Asunto, s.Descripcion,
                    s.FechaInicio, s.FechaFin, s.EstadoSolicitud, s.NivelActual,
                    s.MotivoRechazo, s.FechaCreacion, s.FechaActualizacion,
-                   t.Nombre AS TipoNombre,
+                   t.Nombre AS TipoNombre, t.Codigo AS TipoCodigo,
                    u.Nombres AS SolicitanteNombres, u.Apellidos AS SolicitanteApellidos,
-                   jefeCargo.Nombre AS JefeAprobadorCargoNombre
+                   u.EmailCorporativo AS SolicitanteEmail, u.Telefono AS SolicitanteTelefono,
+                   solicitanteCargo.Nombre AS SolicitanteCargo,
+                   jefeCargo.Nombre AS JefeAprobadorCargoNombre,
+                   (SELECT e.Nombre FROM gcp_usuariosempresas ue
+                    INNER JOIN gcp_empresas e ON e.Id = ue.EmpresaId
+                    WHERE ue.UsuarioId = s.UsuarioId ORDER BY e.Id LIMIT 1) AS EmpresaNombre
             FROM gcp_solicitudes s
             INNER JOIN gcp_solicitudtipos t ON t.Id = s.TipoId
             INNER JOIN gcp_usuarios u ON u.Id = s.UsuarioId
             LEFT JOIN gcp_cargos jefeCargo ON jefeCargo.Id = s.AprobadorCargoId
+            LEFT JOIN gcp_cargos solicitanteCargo ON solicitanteCargo.Id = u.CargoId
         ";
     }
 }

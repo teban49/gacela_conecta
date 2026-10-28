@@ -47,9 +47,9 @@ class LicenciaService
         if ($companyId === false || $companyId === null || $companyId < 1 || !$this->repository->isActiveCompany($companyId)) {
             $errors['EmpresaId'] = ['Selecciona una empresa activa.'];
         }
-        $areaId = $this->parseInteger($data['AreaId'] ?? null);
-        if ($areaId === false || $areaId === null || $areaId < 1 || !$this->repository->isActiveArea($areaId)) {
-            $errors['AreaId'] = ['Selecciona un área activa.'];
+        $rolId = $this->parseInteger($data['RolId'] ?? null);
+        if ($rolId === false || $rolId === null || $rolId < 1 || !$this->repository->isActiveRole($rolId)) {
+            $errors['RolId'] = ['Selecciona un rol activo.'];
         }
 
         $allowedTypes = ['comercial', 'opensource', 'personalizado'];
@@ -120,7 +120,7 @@ class LicenciaService
             'Nombre' => $name,
             'Tipo' => $type,
             'EmpresaId' => $companyId,
-            'AreaId' => $areaId,
+            'RolId' => $rolId,
             'ActivosIds' => $assetIds,
             'Cantidad' => $quantity,
             'FechaVencimiento' => $expiry,

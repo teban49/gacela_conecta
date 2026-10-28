@@ -78,7 +78,7 @@ class IntranetRepository extends BaseRepository
 
     public function getAreas(): array
     {
-        $stmt = $this->db->prepare("SELECT * FROM gcp_areas WHERE Estado = 1 ORDER BY Nombre ASC");
+        $stmt = $this->db->prepare("SELECT * FROM GCP_Intranet_Areas WHERE Estado = 1 ORDER BY Nombre ASC");
         $stmt->execute();
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
     }
@@ -95,40 +95,4 @@ class IntranetRepository extends BaseRepository
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
     }
 
-    public function createNoticia(array $data): int
-    {
-        $sql = "INSERT INTO GCP_Intranet_Noticias (Titulo, Resumen, Contenido, ImagenUrl, Destacado, CreadoPorUsuarioId)
-                VALUES (:Titulo, :Resumen, :Contenido, :ImagenUrl, :Destacado, :CreadoPorUsuarioId)";
-        $stmt = $this->db->prepare($sql);
-        $stmt->execute([
-            ':Titulo' => $data['Titulo'],
-            ':Resumen' => $data['Resumen'] ?? null,
-            ':Contenido' => $data['Contenido'],
-            ':ImagenUrl' => $data['ImagenUrl'] ?? null,
-            ':Destacado' => isset($data['Destacado']) ? ($data['Destacado'] ? 1 : 0) : 0,
-            ':CreadoPorUsuarioId' => $data['CreadoPorUsuarioId'] ?? 1,
-        ]);
-        return (int) $this->db->lastInsertId();
-    }
-
-    public function getManuales(): array
-    {
-        $stmt = $this->db->prepare("SELECT * FROM GCP_Intranet_Manuales WHERE Estado = 1 ORDER BY Titulo ASC");
-        $stmt->execute();
-        return $stmt->fetchAll(PDO::FETCH_ASSOC);
-    }
-
-    public function getPildoras(): array
-    {
-        $stmt = $this->db->prepare("SELECT * FROM GCP_Intranet_Pildoras WHERE Estado = 1 ORDER BY Id DESC");
-        $stmt->execute();
-        return $stmt->fetchAll(PDO::FETCH_ASSOC);
-    }
-
-    public function getLinks(): array
-    {
-        $stmt = $this->db->prepare("SELECT * FROM GCP_Intranet_Links WHERE Estado = 1 ORDER BY Orden ASC, Titulo ASC");
-        $stmt->execute();
-        return $stmt->fetchAll(PDO::FETCH_ASSOC);
-    }
 }

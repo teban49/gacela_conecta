@@ -5,6 +5,7 @@ namespace App\Controllers\Intranet;
 use App\Core\Auth;
 use App\Core\Request;
 use App\Core\Response;
+use App\Core\RoleAccess;
 use App\Services\Intranet\IntranetService;
 
 class IntranetController
@@ -80,11 +81,6 @@ class IntranetController
         }
     }
 
-    public function organigrama(): void
-    {
-        Response::success($this->service->getOrganigrama(), 'Organigrama corporativo obtenido.');
-    }
-
     public function calidadDocumentos(): void
     {
         $user = Auth::user();
@@ -94,18 +90,27 @@ class IntranetController
             Response::validationError(['EmpresaId' => ['Selecciona una empresa válida.']]);
         }
 
-        if (!$user || !$this->service->userBelongsToCompany((int) ($user['id'] ?? 0), $companyId)) {
+        if (!$user || !$this->canAccessCompany($user, $companyId)) {
             Response::forbidden('No tienes acceso a los documentos de esta empresa.');
         }
 
-        Response::success($this->service->getCalidadDocumentos($companyId), 'Documentos de Calidad obtenidos.');
+        $documents = $this->service->getCalidadDocumentos($companyId);
+        $areas = RoleAccess::calidadAreas($user);
+        if ($areas !== null) {
+            $documents = array_values(array_filter($documents, static fn (array $doc) => in_array($doc['area'] ?? '', $areas, true)));
+        }
+
+        Response::success($documents, 'Documentos de Calidad obtenidos.');
     }
 
     public function descargarCalidadDocumento(int $companyId, string $area, string $filename): void
     {
         $user = Auth::user();
-        if (!$user || !$this->service->userBelongsToCompany((int) ($user['id'] ?? 0), $companyId)) {
+        if (!$user || !$this->canAccessCompany($user, $companyId)) {
             Response::forbidden('No tienes acceso a los documentos de esta empresa.');
+        }
+        if (!RoleAccess::canViewCalidadArea($user, rawurldecode($area))) {
+            Response::forbidden('Tu rol no tiene acceso a los documentos de esta área.');
         }
 
         $path = $this->service->getCalidadDocumentoPath(
@@ -152,43 +157,20 @@ class IntranetController
         Response::success(null, $result['message']);
     }
 
+    private function canAccessCompany(array $user, int $companyId): bool
+    {
+        return RoleAccess::seesAllCompanies($user)
+            || $this->service->userBelongsToCompany((int) ($user['id'] ?? 0), $companyId);
+    }
+
     private function authorizeCalidadAdmin(int $companyId): void
     {
         $user = Auth::user();
-        $roles = array_map(
-            static fn ($role) => is_array($role) ? ($role['Codigo'] ?? '') : $role,
-            $user['roles'] ?? []
-        );
-        if (!$user || !in_array('admin', $roles, true)) {
+        if (!$user || !RoleAccess::isAdmin($user)) {
             Response::forbidden('Solo el administrador puede gestionar los documentos de Calidad.');
         }
-        if (!$this->service->userBelongsToCompany((int) ($user['id'] ?? 0), $companyId)) {
+        if (!$this->canAccessCompany($user, $companyId)) {
             Response::forbidden('No tienes acceso a los documentos de esta empresa.');
-        }
-    }
-
-    public function upsertOrganigrama(): void
-    {
-        $data = Request::json();
-        $result = $this->service->upsertOrganigramaNodo($data);
-        if ($result['success']) {
-            Response::success(null, $result['message']);
-        } else {
-            Response::error($result['message']);
-        }
-    }
-
-    public function storeNoticia(): void
-    {
-        $user = Auth::user();
-        $data = Request::json();
-        $data['CreadoPorUsuarioId'] = $user['id'] ?? 1;
-
-        $result = $this->service->createNoticia($data);
-        if ($result['success']) {
-            Response::created($result['data'] ?? null, $result['message']);
-        } else {
-            Response::error($result['message']);
         }
     }
 }

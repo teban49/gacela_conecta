@@ -3,7 +3,11 @@ import { Link, useLocation } from 'react-router-dom';
 import { Home, ShieldCheck, BookOpen, Phone, FileText, Headphones, Shield, ClipboardList, Package, LayoutDashboard } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { applicationsAPI } from '../services/applicationsAPI';
+import { GESTION_EXTERNAL_URL, usesExternalGestion } from '../utils/gestionAccess';
 
+// Módulos aún no implementados: se ocultan del menú, sin eliminar sus definiciones ni iconos
+const HIDDEN_APP_CODES = ['incidencias', 'inventario', 'seguridad', 'configuracion', 'fondo_reposicion'];
+const HIDDEN_APP_ROUTES = ['/incidencias', '/inventario', '/seguridad', '/security', '/configuracion', '/fondo-reposicion'];
 export const Sidebar = () => {
   const location = useLocation();
   const { user, hasPermission } = useAuth();
@@ -47,25 +51,29 @@ export const Sidebar = () => {
   // Convertir aplicaciones de BD a items de menú
   const menuItems = applications
     .filter(app => app.Estado && app.Visible)
+    .filter(app => !HIDDEN_APP_CODES.includes(app.Codigo) && !HIDDEN_APP_ROUTES.includes(app.Ruta))
     .map(app => ({
       title: app.Nombre,
       href: app.Ruta || `/${app.Codigo}`,
       icon: getIconForApp(app.Icono),
       permission: app.Codigo === 'gestion' || app.Ruta === '/gestion'
         ? ['gestion.ver', 'gestion.incidencias.ver']
-        : `${app.Codigo}.ver`
+        : (app.Codigo === 'dashboard' || app.Ruta === '/dashboard' ? undefined : `${app.Codigo}.ver`)
     }));
 
   // Si no hay aplicaciones en BD, usar menú hardcoded como fallback
   const fallbackMenuItems = [
-    { title: 'Home Principal', href: '/dashboard', icon: Home, permission: 'dashboard.ver' },
+    { title: 'Home Principal', href: '/dashboard', icon: Home },
     { title: 'Intranet', href: '/intranet', icon: BookOpen, permission: 'intranet.ver' },
     { title: 'Solicitudes', href: '/solicitudes', icon: ClipboardList, permission: 'solicitudes.ver' },
     { title: 'Gestión Tecnológica', href: '/gestion', icon: Package, permission: ['gestion.ver', 'gestion.incidencias.ver'] },
-    { title: 'Seguridad', href: '/security', icon: Shield, permission: 'seguridad.ver' },
   ];
 
-  const finalMenuItems = menuItems.length > 0 ? menuItems : fallbackMenuItems;
+  const finalMenuItems = (menuItems.length > 0 ? menuItems : fallbackMenuItems).map((item) => (
+    item.href === '/gestion' && usesExternalGestion(user)
+      ? { ...item, href: GESTION_EXTERNAL_URL, external: true }
+      : item
+  ));
 
   const visibleItems = finalMenuItems.filter((item) => {
     if (!item.permission) return true;
@@ -112,18 +120,24 @@ export const Sidebar = () => {
       </div>
       {visibleItems.map((item) => {
         const Icon = item.icon;
-        const isActive = location.pathname.startsWith(item.href);
+        const isActive = !item.external && location.pathname.startsWith(item.href);
+        const className = `flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all ${
+          isActive
+            ? 'bg-orange-50 text-orange-600 font-semibold'
+            : 'text-gray-600 hover:bg-gray-100'
+        }`;
+
+        if (item.external) {
+          return (
+            <a key={item.title} href={item.href} target="_blank" rel="noopener noreferrer" className={className}>
+              <Icon size={18} />
+              <span>{item.title}</span>
+            </a>
+          );
+        }
 
         return (
-          <Link
-            key={item.title}
-            to={item.href}
-            className={`flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all ${
-              isActive
-                ? 'bg-orange-50 text-orange-600 font-semibold'
-                : 'text-gray-600 hover:bg-gray-100'
-            }`}
-          >
+          <Link key={item.title} to={item.href} className={className}>
             <Icon size={18} />
             <span>{item.title}</span>
           </Link>

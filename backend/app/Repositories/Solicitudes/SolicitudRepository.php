@@ -131,12 +131,14 @@ class SolicitudRepository extends BaseRepository
                    sol.Nombres AS SolicitanteNombre, sol.Apellidos AS SolicitanteApellidos,
                    asig.Nombres AS AsignadoNombre, asig.Apellidos AS AsignadoApellidos,
                    emp.Nombre AS EmpresaNombre,
+                   act.CodigoInventario AS ActivoCodigo, act.Descripcion AS ActivoDescripcion,
                    (SELECT COUNT(*) FROM gestion_tickets_seguimiento seg WHERE seg.SolicitudId = s.Id) AS Seguimientos
             FROM {$this->table} s
             LEFT JOIN gestion_tickets_categorias c ON c.Id = s.CategoriaId
             LEFT JOIN gcp_usuarios sol ON sol.Id = s.SolicitanteId
             LEFT JOIN gcp_usuarios asig ON asig.Id = s.AsignadoA
             LEFT JOIN gcp_empresas emp ON emp.Id = s.EmpresaId
+            LEFT JOIN gestion_activos act ON act.Id = s.ActivoId
             WHERE s.Tipo = 'incidencia'
         ";
         $params = [];
@@ -159,12 +161,14 @@ class SolicitudRepository extends BaseRepository
                    c.Nombre AS CategoriaNombre, c.Color AS CategoriaColor,
                    sol.Nombres AS SolicitanteNombre, sol.Apellidos AS SolicitanteApellidos,
                    asig.Nombres AS AsignadoNombre, asig.Apellidos AS AsignadoApellidos,
-                   emp.Nombre AS EmpresaNombre
+                   emp.Nombre AS EmpresaNombre,
+                   act.CodigoInventario AS ActivoCodigo, act.Descripcion AS ActivoDescripcion
             FROM {$this->table} s
             LEFT JOIN gestion_tickets_categorias c ON c.Id = s.CategoriaId
             LEFT JOIN gcp_usuarios sol ON sol.Id = s.SolicitanteId
             LEFT JOIN gcp_usuarios asig ON asig.Id = s.AsignadoA
             LEFT JOIN gcp_empresas emp ON emp.Id = s.EmpresaId
+            LEFT JOIN gestion_activos act ON act.Id = s.ActivoId
             WHERE s.Id = :Id AND s.Tipo = 'incidencia'
         ");
         $stmt->execute([':Id' => $id]);
@@ -349,8 +353,8 @@ class SolicitudRepository extends BaseRepository
         $ticket = $this->generateTicket();
         
         $sql = "
-            INSERT INTO {$this->table} (Ticket, CategoriaId, SolicitanteId, EmpresaId, AsignadoA, Prioridad, Estado, Tipo, Titulo, Descripcion, Ubicacion, ArchivoAdjunto, ArchivoAdjuntoNombre, Canal, FechaVencimiento)
-            VALUES (:Ticket, :CategoriaId, :SolicitanteId, :EmpresaId, :AsignadoA, :Prioridad, :Estado, :Tipo, :Titulo, :Descripcion, :Ubicacion, :ArchivoAdjunto, :ArchivoAdjuntoNombre, :Canal, :FechaVencimiento)
+            INSERT INTO {$this->table} (Ticket, CategoriaId, SolicitanteId, EmpresaId, ActivoId, AsignadoA, Prioridad, Estado, Tipo, Titulo, Descripcion, Ubicacion, ArchivoAdjunto, ArchivoAdjuntoNombre, Canal, FechaVencimiento)
+            VALUES (:Ticket, :CategoriaId, :SolicitanteId, :EmpresaId, :ActivoId, :AsignadoA, :Prioridad, :Estado, :Tipo, :Titulo, :Descripcion, :Ubicacion, :ArchivoAdjunto, :ArchivoAdjuntoNombre, :Canal, :FechaVencimiento)
         ";
 
         $stmt = $this->db->prepare($sql);
@@ -359,6 +363,7 @@ class SolicitudRepository extends BaseRepository
             ':CategoriaId' => $solicitud['CategoriaId'],
             ':SolicitanteId' => $solicitud['SolicitanteId'],
             ':EmpresaId' => $solicitud['EmpresaId'] ?? null,
+            ':ActivoId' => $solicitud['ActivoId'] ?? null,
             ':AsignadoA' => $solicitud['AsignadoA'] ?? null,
             ':Prioridad' => $solicitud['Prioridad'] ?? 'media',
             ':Estado' => $solicitud['Estado'] ?? 'nueva',

@@ -16,6 +16,7 @@ export const gestionAPI = {
 
   // Activos
   getActivos: () => api.get('/gestion/activos'),
+  getMisActivos: () => api.get('/gestion/activos/mis-activos'),
   getCategoriasActivos: () => api.get('/gestion/activos/categorias'),
   getEmpresas: () => api.get('/gestion/empresas'),
   getProveedores: () => api.get('/gestion/proveedores'),

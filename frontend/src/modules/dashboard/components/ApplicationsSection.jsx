@@ -2,13 +2,13 @@ import {
   Newspaper,
   ClipboardList,
   Ticket,
-  Wallet,
   Boxes,
   Shield,
   Package
 } from "lucide-react";
 import ApplicationCard from "./ApplicationCard";
 import { useAuth } from "../../../contexts/AuthContext";
+import { GESTION_EXTERNAL_URL, usesExternalGestion } from "../../../utils/gestionAccess";
 
 const ApplicationsSection = () => {
   const { user, hasPermission } = useAuth();
@@ -43,17 +43,9 @@ const ApplicationsSection = () => {
       description: "Consulta y crea tickets de incidencias tecnológicas.",
       icon: Package,
       color: "#10b981",
-      to: "/gestion",
+      to: usesExternalGestion(user) ? GESTION_EXTERNAL_URL : "/gestion",
+      external: usesExternalGestion(user),
       permission: ["gestion.ver", "gestion.incidencias.ver"]
-    },
-    {
-      title: "Fondo de Reposición",
-      description: "Administración del Fondo de Reposición.",
-      icon: Wallet,
-      color: "#06b6d4",
-      to: "https://fondorp.gacelaconecta.com/",
-      external: true,
-      permission: "fondo_reposicion.ver"
     },
     {
       title: "Inventario",
@@ -61,7 +53,8 @@ const ApplicationsSection = () => {
       icon: Boxes,
       color: "#10b981",
       to: "/inventario",
-      permission: "inventario.ver"
+      permission: "inventario.ver",
+      comingSoon: true
     },
     {
       title: "Seguridad",
@@ -69,11 +62,14 @@ const ApplicationsSection = () => {
       icon: Shield,
       color: "#ec4899",
       to: "/security",
-      permission: "seguridad.ver"
+      permission: "seguridad.ver",
+      comingSoon: true
     }
   ];
 
+  // Inventario y Seguridad se ocultan hasta que se implementen.
   const visibleApplications = applications.filter(app => {
+    if (app.comingSoon) return false;
     if (!app.permission) return true;
     if (isSuperAdmin) return true;
     const requiredPermissions = Array.isArray(app.permission) ? app.permission : [app.permission];

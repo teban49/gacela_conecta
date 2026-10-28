@@ -5,6 +5,7 @@ import {
 } from 'lucide-react';
 import { solicitudesAPI } from '../services/solicitudesAPI';
 import { useAuth } from '../../../contexts/AuthContext';
+import { printSolicitudDocument } from '../utils/printSolicitudDocument';
 
 const STATUS_LABELS = {
   Pendiente_Jefe: 'Pendiente de jefe directo',
@@ -403,6 +404,19 @@ const SolicitudesPage = () => {
                   <div className="rounded-xl bg-slate-50 p-4"><div className="text-xs font-semibold uppercase text-slate-500">Fechas solicitadas</div><div className="mt-1 font-medium">{formatDate(selectedRequest.FechaInicio)} – {formatDate(selectedRequest.FechaFin)}</div></div>
                 </div>
                 <div><h3 className="mb-1 text-sm font-semibold text-slate-700">Descripción</h3><p className="whitespace-pre-wrap text-sm text-slate-600">{selectedRequest.Descripcion}</p></div>
+                {selectedRequest.EstadoSolicitud === 'Aprobada' && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (!printSolicitudDocument(selectedRequest)) {
+                        setDetailError('El navegador bloqueó la ventana. Permite las ventanas emergentes e inténtalo de nuevo.');
+                      }
+                    }}
+                    className="inline-flex items-center gap-2 rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white hover:bg-slate-800"
+                  >
+                    <FileText size={16} /> Generar documento para archivo físico
+                  </button>
+                )}
                 {!!selectedRequest.Adjuntos?.length && (
                   <div>
                     <h3 className="mb-2 text-sm font-semibold text-slate-700">Adjuntos</h3>

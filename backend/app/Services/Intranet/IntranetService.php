@@ -6,7 +6,6 @@ use App\Repositories\Intranet\IntranetRepository;
 use App\Repositories\Intranet\DocumentRepository;
 use App\Repositories\Intranet\DocumentoRepository;
 use App\Repositories\Intranet\NoticiaRepository;
-use App\Repositories\Intranet\OrganigramaRepository;
 use App\Repositories\Intranet\CalidadDocumentoRepository;
 use App\Helpers\UploadHelper;
 
@@ -14,14 +13,12 @@ class IntranetService
 {
     private IntranetRepository $intranetRepo;
     private DocumentRepository $documentRepo;
-    private OrganigramaRepository $organigramaRepo;
     private CalidadDocumentoRepository $calidadDocumentoRepo;
 
     public function __construct()
     {
         $this->intranetRepo = new IntranetRepository();
         $this->documentRepo = new DocumentRepository();
-        $this->organigramaRepo = new OrganigramaRepository();
         $this->calidadDocumentoRepo = new CalidadDocumentoRepository();
     }
 
@@ -41,8 +38,6 @@ class IntranetService
             'categorias' => $this->intranetRepo->getCategorias(),
             'noticias' => $noticias,
             'manuales' => $manuales,
-            'pildoras' => [],
-            'links' => [],
         ];
     }
 
@@ -123,11 +118,6 @@ class IntranetService
         ];
     }
 
-    public function getOrganigrama(): array
-    {
-        return $this->organigramaRepo->getOrganigrama();
-    }
-
     public function userBelongsToCompany(int $userId, int $companyId): bool
     {
         return $this->intranetRepo->userBelongsToCompany($userId, $companyId);
@@ -184,24 +174,5 @@ class IntranetService
         }
 
         return ['success' => true, 'message' => 'Documento eliminado correctamente.'];
-    }
-
-    public function upsertOrganigramaNodo(array $data): array
-    {
-        $res = $this->organigramaRepo->upsertNodo($data);
-        return [
-            'success' => $res,
-            'message' => $res ? 'Organigrama actualizado.' : 'No fue posible actualizar el organigrama.'
-        ];
-    }
-
-    public function createNoticia(array $data): array
-    {
-        $id = $this->intranetRepo->createNoticia($data);
-        return [
-            'success' => true,
-            'message' => 'Noticia publicada exitosamente.',
-            'data' => ['Id' => $id]
-        ];
     }
 }

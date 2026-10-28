@@ -96,7 +96,7 @@ ALTER TABLE gestion_mantenimiento
 
 ALTER TABLE gestion_licencias
     ADD COLUMN IF NOT EXISTS EmpresaId INT NULL AFTER Id,
-    ADD COLUMN IF NOT EXISTS AreaId INT NULL AFTER EmpresaId;
+    ADD COLUMN IF NOT EXISTS RolId INT NULL AFTER EmpresaId;
 
 ALTER TABLE gestion_licencias_asignaciones
     MODIFY COLUMN UsuarioId INT NULL;
@@ -165,8 +165,8 @@ SET @migration_sql = IF(
     (SELECT COUNT(*) FROM information_schema.TABLE_CONSTRAINTS
      WHERE CONSTRAINT_SCHEMA = DATABASE()
        AND TABLE_NAME = 'gestion_licencias'
-       AND CONSTRAINT_NAME = 'fk_gestion_licencias_area') = 0,
-    'ALTER TABLE gestion_licencias ADD CONSTRAINT fk_gestion_licencias_area FOREIGN KEY (AreaId) REFERENCES gcp_areas(Id) ON DELETE RESTRICT',
+       AND CONSTRAINT_NAME = 'fk_gestion_licencias_rol') = 0,
+    'ALTER TABLE gestion_licencias ADD CONSTRAINT fk_gestion_licencias_rol FOREIGN KEY (RolId) REFERENCES gcp_roles(Id) ON DELETE RESTRICT',
     'SET @migration_noop = 1'
 );
 PREPARE migration_statement FROM @migration_sql;

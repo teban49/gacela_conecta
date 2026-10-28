@@ -73,38 +73,6 @@ CREATE TABLE IF NOT EXISTS gestion_mantenimiento (
     CONSTRAINT fk_mantenimiento_tecnico FOREIGN KEY (TecnicoId) REFERENCES gcp_usuarios(Id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- Tabla de Incidencias Tecnológicas
-CREATE TABLE IF NOT EXISTS gestion_incidencias (
-    Id INT AUTO_INCREMENT PRIMARY KEY,
-    Ticket VARCHAR(20) UNIQUE,
-    ActivoId INT,
-    Tipo ENUM('hardware', 'software', 'red', 'seguridad', 'otro') DEFAULT 'hardware',
-    Prioridad ENUM('baja', 'media', 'alta', 'critica') DEFAULT 'media',
-    Estado ENUM('abierta', 'en_proceso', 'resuelta', 'cerrada') DEFAULT 'abierta',
-    Titulo VARCHAR(255) NOT NULL,
-    Descripcion TEXT NOT NULL,
-    ReportadoPor INT NOT NULL,
-    AsignadoA INT,
-    FechaReporte DATETIME DEFAULT CURRENT_TIMESTAMP,
-    FechaResolucion DATETIME,
-    TiempoResolucionMinutos INT,
-    Solucion TEXT,
-    CausaRaiz TEXT,
-    ArchivoAdjunto VARCHAR(500),
-    Satisfaccion INT,
-    FechaCreacion DATETIME DEFAULT CURRENT_TIMESTAMP,
-    FechaActualizacion DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    INDEX idx_ticket (Ticket),
-    INDEX idx_activo (ActivoId),
-    INDEX idx_reportado_por (ReportadoPor),
-    INDEX idx_asignado (AsignadoA),
-    INDEX idx_estado (Estado),
-    INDEX idx_prioridad (Prioridad),
-    CONSTRAINT fk_incidencias_activo FOREIGN KEY (ActivoId) REFERENCES gestion_activos(Id) ON DELETE SET NULL,
-    CONSTRAINT fk_incidencias_reportado FOREIGN KEY (ReportadoPor) REFERENCES gcp_usuarios(Id) ON DELETE CASCADE,
-    CONSTRAINT fk_incidencias_asignado FOREIGN KEY (AsignadoA) REFERENCES gcp_usuarios(Id) ON DELETE SET NULL
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
 -- Tabla de Licencias de Software
 CREATE TABLE IF NOT EXISTS gestion_licencias (
     Id INT AUTO_INCREMENT PRIMARY KEY,

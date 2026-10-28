@@ -65,15 +65,17 @@ const GestionPage = () => {
     Titulo: '',
     Descripcion: '',
     EmpresaId: '',
+    ActivoId: '',
     Adjunto: null,
   });
+  const [misActivos, setMisActivos] = useState([]);
   const [mantenimientos, setMantenimientos] = useState([]);
   const [selectedMaintenance, setSelectedMaintenance] = useState(null);
   const [maintenanceForm, setMaintenanceForm] = useState({ Ejecutor: 'ti', ProveedorId: '' });
   const [maintenanceSaving, setMaintenanceSaving] = useState(false);
   const [maintenanceError, setMaintenanceError] = useState('');
   const [licencias, setLicencias] = useState([]);
-  const [licenseOptions, setLicenseOptions] = useState({ Empresas: [], Areas: [], Activos: [] });
+  const [licenseOptions, setLicenseOptions] = useState({ Empresas: [], Roles: [], Activos: [] });
   const [showLicenseForm, setShowLicenseForm] = useState(false);
   const [editingLicenseId, setEditingLicenseId] = useState(null);
   const [licenseSaving, setLicenseSaving] = useState(false);
@@ -83,7 +85,7 @@ const GestionPage = () => {
     Nombre: '',
     Tipo: 'comercial',
     EmpresaId: '',
-    AreaId: '',
+    RolId: '',
     Proveedor: '',
     NumeroLicencia: '',
     Cantidad: '1',
@@ -122,7 +124,16 @@ const GestionPage = () => {
             gestionAPI.getOpcionesLicencias(),
           ])
         : Promise.resolve(null);
-      const [incidentData, managementData] = await Promise.all([incidentRequests, managementRequests]);
+      const myAssetsRequest = gestionAPI.getMisActivos().catch(() => null);
+      const [incidentData, managementData, myAssetsResponse] = await Promise.all([incidentRequests, managementRequests, myAssetsRequest]);
+      const ownAssets = myAssetsResponse?.data?.data ?? [];
+      setMisActivos(ownAssets);
+      setIncidentForm((current) => ({
+        ...current,
+        ActivoId: ownAssets.some((asset) => String(asset.Id) === current.ActivoId)
+          ? current.ActivoId
+          : (ownAssets.length === 1 ? String(ownAssets[0].Id) : ''),
+      }));
       if (incidentData) {
         const [incidentsResponse, incidentCategoriesResponse, incidentContextResponse] = incidentData;
         setIncidencias(incidentsResponse.data?.data ?? []);
@@ -148,7 +159,7 @@ const GestionPage = () => {
       setProveedores(activeProviders);
       setMantenimientos(maintenanceResponse.data?.data ?? []);
       setLicencias(licensesResponse.data?.data ?? []);
-      setLicenseOptions(licenseOptionsResponse.data?.data ?? { Empresas: [], Areas: [], Activos: [] });
+      setLicenseOptions(licenseOptionsResponse.data?.data ?? { Empresas: [], Roles: [], Activos: [] });
       setAssetForm((current) => ({
         ...current,
         CategoriaId: current.CategoriaId || (activeCategories[0]?.Id ? String(activeCategories[0].Id) : ''),
@@ -157,7 +168,7 @@ const GestionPage = () => {
       setLicenseForm((current) => ({
         ...current,
         EmpresaId: current.EmpresaId || (licenseOptionsResponse.data?.data?.Empresas?.[0]?.Id ? String(licenseOptionsResponse.data.data.Empresas[0].Id) : ''),
-        AreaId: current.AreaId || (licenseOptionsResponse.data?.data?.Areas?.[0]?.Id ? String(licenseOptionsResponse.data.data.Areas[0].Id) : ''),
+        RolId: current.RolId || (licenseOptionsResponse.data?.data?.Roles?.[0]?.Id ? String(licenseOptionsResponse.data.data.Roles[0].Id) : ''),
       }));
     } catch (error) {
       console.error('Error loading data:', error);
@@ -181,7 +192,7 @@ const GestionPage = () => {
   ));
   const filteredLicencias = licencias.filter((license) => (
     [
-      license.Nombre, license.Tipo, license.EmpresaNombre, license.AreaNombre,
+      license.Nombre, license.Tipo, license.EmpresaNombre, license.RolNombre,
       license.Proveedor, license.NumeroLicencia, license.FechaVencimiento,
       ...(license.Activos ?? []).flatMap((asset) => [asset.CodigoInventario, asset.TipoActivo, asset.Placa]),
     ].some((value) => String(value ?? '').toLocaleLowerCase().includes(searchTerm.toLocaleLowerCase()))
@@ -354,7 +365,7 @@ const GestionPage = () => {
       const payload = {
         ...licenseForm,
         EmpresaId: Number(licenseForm.EmpresaId),
-        AreaId: Number(licenseForm.AreaId),
+        RolId: Number(licenseForm.RolId),
         Cantidad: Number(licenseForm.Cantidad),
         ActivosIds: licenseForm.ActivosIds.map(Number),
         FechaVencimiento: licenseForm.FechaVencimiento || null,
@@ -385,7 +396,7 @@ const GestionPage = () => {
       Nombre: license.Nombre ?? '',
       Tipo: license.Tipo ?? 'comercial',
       EmpresaId: String(license.EmpresaId ?? ''),
-      AreaId: String(license.AreaId ?? ''),
+      RolId: String(license.RolId ?? ''),
       Proveedor: license.Proveedor ?? '',
       NumeroLicencia: license.NumeroLicencia ?? '',
       Cantidad: String(license.Cantidad ?? 1),
@@ -406,6 +417,7 @@ const GestionPage = () => {
     body.append('Titulo', incidentForm.Titulo.trim());
     body.append('Descripcion', incidentForm.Descripcion.trim());
     if (incidentContext.Empresas.length > 1) body.append('EmpresaId', incidentForm.EmpresaId);
+    if (misActivos.length > 0) body.append('ActivoId', incidentForm.ActivoId);
     if (incidentForm.Adjunto) body.append('Adjunto', incidentForm.Adjunto);
     try {
       await gestionAPI.createIncidencia(body);
@@ -780,6 +792,21 @@ const GestionPage = () => {
               </div>
             )}
             <label className="text-sm font-semibold text-slate-700 sm:col-span-2">
+              Activo {misActivos.length > 0 && <span className="text-red-600">*</span>}
+              {misActivos.length > 0 ? (
+                <select required value={incidentForm.ActivoId} onChange={(event) => setIncidentForm({ ...incidentForm, ActivoId: event.target.value })} className="mt-2 w-full rounded-xl border border-slate-200 bg-white px-4 py-3">
+                  <option value="">Selecciona el activo afectado</option>
+                  {misActivos.map((asset) => (
+                    <option key={asset.Id} value={asset.Id}>
+                      {asset.CodigoInventario} - {asset.CategoriaNombre}{asset.Marca ? ` ${asset.Marca}` : ''}{asset.Modelo ? ` ${asset.Modelo}` : ''}
+                    </option>
+                  ))}
+                </select>
+              ) : (
+                <input value="No tienes activos asignados" readOnly className="mt-2 w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-slate-600" />
+              )}
+            </label>
+            <label className="text-sm font-semibold text-slate-700 sm:col-span-2">
               Evidencia adjunta <span className="font-normal text-slate-400">(opcional)</span>
               <input
                 type="file"
@@ -795,7 +822,7 @@ const GestionPage = () => {
           </div>
           {categoriasIncidencias.length === 0 && <p className="text-sm text-red-700">No hay categorías activas para registrar el ticket.</p>}
           <div className="flex justify-end">
-            <button type="submit" disabled={incidentSaving || categoriasIncidencias.length === 0 || incidentContext.Empresas.length === 0 || (incidentContext.Empresas.length > 1 && !incidentForm.EmpresaId)} className="inline-flex items-center gap-2 rounded-xl bg-green-600 px-5 py-3 font-semibold text-white hover:bg-green-700 disabled:opacity-50">
+            <button type="submit" disabled={incidentSaving || categoriasIncidencias.length === 0 || incidentContext.Empresas.length === 0 || (incidentContext.Empresas.length > 1 && !incidentForm.EmpresaId) || (misActivos.length > 0 && !incidentForm.ActivoId)} className="inline-flex items-center gap-2 rounded-xl bg-green-600 px-5 py-3 font-semibold text-white hover:bg-green-700 disabled:opacity-50">
               <Send size={16} /> {incidentSaving ? 'Creando...' : 'Crear ticket'}
             </button>
           </div>
@@ -865,7 +892,7 @@ const GestionPage = () => {
           <p className="mt-1 text-sm text-slate-600">Licencias activas y vencimientos próximos (30 días).</p>
         </div>
         {canManageLicenses && (
-          <button onClick={() => { setLicenseError(''); setLicenseAssetSearch(''); setEditingLicenseId(null); setLicenseForm({ Nombre: '', Tipo: 'comercial', EmpresaId: licenseOptions.Empresas[0]?.Id ? String(licenseOptions.Empresas[0].Id) : '', AreaId: licenseOptions.Areas[0]?.Id ? String(licenseOptions.Areas[0].Id) : '', Proveedor: '', NumeroLicencia: '', Cantidad: '1', FechaVencimiento: '', Notas: '', ActivosIds: [] }); setShowLicenseForm(true); }} className="inline-flex items-center gap-2 rounded-xl bg-green-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-green-700 transition">
+          <button onClick={() => { setLicenseError(''); setLicenseAssetSearch(''); setEditingLicenseId(null); setLicenseForm({ Nombre: '', Tipo: 'comercial', EmpresaId: licenseOptions.Empresas[0]?.Id ? String(licenseOptions.Empresas[0].Id) : '', RolId: licenseOptions.Roles[0]?.Id ? String(licenseOptions.Roles[0].Id) : '', Proveedor: '', NumeroLicencia: '', Cantidad: '1', FechaVencimiento: '', Notas: '', ActivosIds: [] }); setShowLicenseForm(true); }} className="inline-flex items-center gap-2 rounded-xl bg-green-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-green-700 transition">
             <Plus size={16} /> Nueva Licencia
           </button>
         )}
@@ -891,7 +918,7 @@ const GestionPage = () => {
               </div>
               <dl className="mt-4 space-y-2 text-sm text-slate-600">
                 <div><dt className="inline font-semibold">Empresa:</dt> <dd className="inline">{license.EmpresaNombre}</dd></div>
-                <div><dt className="inline font-semibold">Área:</dt> <dd className="inline">{license.AreaNombre}</dd></div>
+                <div><dt className="inline font-semibold">Rol:</dt> <dd className="inline">{license.RolNombre}</dd></div>
                 <div><dt className="inline font-semibold">Proveedor:</dt> <dd className="inline">{license.Proveedor || '-'}</dd></div>
                 <div><dt className="inline font-semibold">Vencimiento:</dt> <dd className="inline">{license.FechaVencimiento ? new Date(`${license.FechaVencimiento}T00:00:00`).toLocaleDateString() : 'Sin fecha de vencimiento'}</dd></div>
                 <div><dt className="inline font-semibold">Licencias:</dt> <dd className="inline">{license.CantidadUsada} de {license.Cantidad}</dd></div>
@@ -950,6 +977,17 @@ const GestionPage = () => {
             </button>
           </>
         )}
+        {!canViewAllManagement && (
+          <button
+            onClick={() => setActiveTab('misactivos')}
+            className={`flex items-center gap-2 px-4 py-2 rounded-xl font-semibold transition ${
+              activeTab === 'misactivos' ? 'bg-green-600 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+            }`}
+          >
+            <Package size={18} />
+            Mis activos
+          </button>
+        )}
         {canViewIncidents && (
           <button
             onClick={() => setActiveTab('incidencias')}
@@ -981,6 +1019,7 @@ const GestionPage = () => {
             type="text"
             placeholder={{
               activos: 'Buscar activos...',
+              misactivos: 'Buscar entre mis activos...',
               mantenimiento: 'Buscar por activo, empresa o período...',
               incidencias: 'Buscar por ticket, título o solicitante...',
               licencias: 'Buscar por software, empresa, área o activo...',
@@ -998,6 +1037,27 @@ const GestionPage = () => {
         <>
           {canViewAllManagement && activeTab === 'activos' && renderActivos()}
           {canViewAllManagement && activeTab === 'mantenimiento' && renderMantenimiento()}
+          {!canViewAllManagement && activeTab === 'misactivos' && (
+            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+              {misActivos
+                .filter((asset) => `${asset.CodigoInventario} ${asset.CategoriaNombre} ${asset.Marca ?? ''} ${asset.Modelo ?? ''} ${asset.Placa ?? ''}`.toLowerCase().includes(searchTerm.toLowerCase()))
+                .map((asset) => (
+                  <div key={asset.Id} className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+                    <div className="text-xs font-semibold uppercase text-green-700">{asset.CategoriaNombre}</div>
+                    <div className="mt-1 text-lg font-bold text-slate-800">{asset.CodigoInventario}</div>
+                    <div className="mt-2 space-y-1 text-sm text-slate-600">
+                      {asset.Marca && <div>Marca: {asset.Marca}</div>}
+                      {asset.Modelo && <div>Modelo: {asset.Modelo}</div>}
+                      {asset.NumeroSerie && <div>Serie: {asset.NumeroSerie}</div>}
+                      {asset.Placa && <div>Placa: {asset.Placa}</div>}
+                    </div>
+                  </div>
+                ))}
+              {misActivos.length === 0 && (
+                <div className="col-span-full rounded-2xl border border-slate-200 bg-white p-10 text-center text-slate-500">No tienes activos asignados.</div>
+              )}
+            </div>
+          )}
           {activeTab === 'incidencias' && renderIncidencias()}
           {canViewAllManagement && activeTab === 'licencias' && renderLicencias()}
         </>
@@ -1197,9 +1257,9 @@ const GestionPage = () => {
                   {licenseOptions.Empresas.map((company) => <option key={company.Id} value={company.Id}>{company.Nombre}</option>)}
                 </select>
               </label>
-              <label className="text-sm font-semibold text-slate-700">Área *
-                <select required value={licenseForm.AreaId} onChange={(event) => setLicenseForm({ ...licenseForm, AreaId: event.target.value })} className="mt-2 w-full rounded-xl border border-slate-200 bg-white px-4 py-3 font-normal">
-                  {licenseOptions.Areas.map((area) => <option key={area.Id} value={area.Id}>{area.Nombre}</option>)}
+              <label className="text-sm font-semibold text-slate-700">Rol *
+                <select required value={licenseForm.RolId} onChange={(event) => setLicenseForm({ ...licenseForm, RolId: event.target.value })} className="mt-2 w-full rounded-xl border border-slate-200 bg-white px-4 py-3 font-normal">
+                  {licenseOptions.Roles.map((role) => <option key={role.Id} value={role.Id}>{role.Nombre}</option>)}
                 </select>
               </label>
               <label className="text-sm font-semibold text-slate-700">Proveedor de software
@@ -1283,6 +1343,12 @@ const GestionPage = () => {
               <div className="rounded-xl bg-slate-50 p-4">
                 <div className="text-xs font-semibold uppercase text-slate-500">Ubicación</div>
                 <div className="mt-1 font-medium text-slate-800">{selectedIncident.Ubicacion || 'No indicada'}</div>
+              </div>
+              <div className="rounded-xl bg-slate-50 p-4">
+                <div className="text-xs font-semibold uppercase text-slate-500">Activo</div>
+                <div className="mt-1 font-medium text-slate-800">
+                  {selectedIncident.ActivoCodigo ? `${selectedIncident.ActivoCodigo}${selectedIncident.ActivoDescripcion ? ` - ${selectedIncident.ActivoDescripcion}` : ''}` : 'No indicado'}
+                </div>
               </div>
               <div className="sm:col-span-2">
                 <div className="mb-1 text-sm font-semibold text-slate-700">Descripción del problema</div>

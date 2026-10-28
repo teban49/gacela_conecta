@@ -1,5 +1,6 @@
 import { useAuth } from "../../../contexts/AuthContext";
 import { LogOut, UserCircle2 } from "lucide-react";
+import ThemeToggle from "../../../components/ThemeToggle";
 
 const DashboardHeader = () => {
     const { user, logout } = useAuth();
@@ -72,6 +73,8 @@ const DashboardHeader = () => {
                         </div>
 
                     </div>
+
+                    <ThemeToggle />
 
                     <button
                         onClick={handleLogout}

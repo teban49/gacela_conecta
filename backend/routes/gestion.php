@@ -123,6 +123,10 @@ Router::get('/api/v1/gestion/activos/assignee/{usuarioId}', function (int $usuar
     $controller->byAssignee($usuarioId);
 }, ['jwt', 'gestion.ver']);
 
+Router::get('/api/v1/gestion/activos/mis-activos', function () {
+    (new ActivoController())->myAssets();
+}, ['jwt']);
+
 Router::get('/api/v1/gestion/activos/{id}', function (int $id) {
     $controller = new ActivoController();
     $controller->show($id);

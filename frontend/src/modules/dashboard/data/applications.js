@@ -2,7 +2,6 @@ import {
     Building2,
     Ticket,
     ClipboardList,
-    Wallet,
     Users,
     FileText,
     Boxes
@@ -34,15 +33,6 @@ const applications = [
         icon: ClipboardList,
         color: "bg-emerald-600",
         route: "/solicitudes",
-        enabled: true
-    },
-    {
-        id: "reposicion",
-        title: "Fondo de Reposición",
-        description: "Administración del fondo de reposición.",
-        icon: Wallet,
-        color: "bg-purple-600",
-        route: "/reposicion",
         enabled: true
     },
 

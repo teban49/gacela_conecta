@@ -10,7 +10,7 @@ class LicenciaRepository extends BaseRepository
     public function getActive(): array
     {
         $licenses = $this->db->query("
-            SELECT l.*, e.Nombre AS EmpresaNombre, ar.Nombre AS AreaNombre,
+            SELECT l.*, e.Nombre AS EmpresaNombre, ro.Nombre AS RolNombre,
                    CASE
                        WHEN l.FechaVencimiento < CURRENT_DATE THEN 'vencida'
                        WHEN l.FechaVencimiento <= DATE_ADD(CURRENT_DATE, INTERVAL 30 DAY) THEN 'proxima'
@@ -18,7 +18,7 @@ class LicenciaRepository extends BaseRepository
                    END AS EstadoVencimiento
             FROM gestion_licencias l
             LEFT JOIN gcp_empresas e ON e.Id = l.EmpresaId
-            LEFT JOIN gcp_areas ar ON ar.Id = l.AreaId
+            LEFT JOIN gcp_roles ro ON ro.Id = l.RolId
             WHERE l.Estado = 1
             ORDER BY l.FechaVencimiento IS NULL ASC, l.FechaVencimiento ASC, l.Nombre ASC
         ")->fetchAll(PDO::FETCH_ASSOC);
@@ -52,7 +52,7 @@ class LicenciaRepository extends BaseRepository
     {
         return [
             'Empresas' => $this->db->query('SELECT Id, Nombre FROM gcp_empresas WHERE Estado = 1 ORDER BY Nombre ASC')->fetchAll(PDO::FETCH_ASSOC),
-            'Areas' => $this->db->query('SELECT Id, Nombre FROM gcp_areas WHERE Estado = 1 ORDER BY Nombre ASC')->fetchAll(PDO::FETCH_ASSOC),
+            'Roles' => $this->db->query('SELECT Id, Nombre FROM gcp_roles WHERE Estado = 1 ORDER BY Nombre ASC')->fetchAll(PDO::FETCH_ASSOC),
             'Activos' => $this->db->query("
                 SELECT a.Id, a.EmpresaId, a.CodigoInventario, a.Placa, c.Nombre AS TipoActivo
                 FROM gestion_activos a
@@ -70,9 +70,9 @@ class LicenciaRepository extends BaseRepository
         return (bool) $stmt->fetchColumn();
     }
 
-    public function isActiveArea(int $id): bool
+    public function isActiveRole(int $id): bool
     {
-        $stmt = $this->db->prepare('SELECT 1 FROM gcp_areas WHERE Id = :Id AND Estado = 1');
+        $stmt = $this->db->prepare('SELECT 1 FROM gcp_roles WHERE Id = :Id AND Estado = 1');
         $stmt->execute([':Id' => $id]);
         return (bool) $stmt->fetchColumn();
     }
@@ -98,10 +98,10 @@ class LicenciaRepository extends BaseRepository
             $stmt = $this->db->prepare("
                 INSERT INTO gestion_licencias
                     (Nombre, Tipo, Proveedor, NumeroLicencia, Cantidad, CantidadUsada,
-                     FechaVencimiento, Notas, EmpresaId, AreaId, Estado)
+                     FechaVencimiento, Notas, EmpresaId, RolId, Estado)
                 VALUES
                     (:Nombre, :Tipo, :Proveedor, :NumeroLicencia, :Cantidad, :CantidadUsada,
-                     :FechaVencimiento, :Notas, :EmpresaId, :AreaId, 1)
+                     :FechaVencimiento, :Notas, :EmpresaId, :RolId, 1)
             ");
             $stmt->execute([
                 ':Nombre' => $license['Nombre'],
@@ -113,7 +113,7 @@ class LicenciaRepository extends BaseRepository
                 ':FechaVencimiento' => $license['FechaVencimiento'],
                 ':Notas' => $license['Notas'],
                 ':EmpresaId' => $license['EmpresaId'],
-                ':AreaId' => $license['AreaId'],
+                ':RolId' => $license['RolId'],
             ]);
             $licenseId = (int) $this->db->lastInsertId();
             $assignment = $this->db->prepare("
@@ -148,7 +148,7 @@ class LicenciaRepository extends BaseRepository
                     SET Nombre = :Nombre, Tipo = :Tipo, Proveedor = :Proveedor,
                         NumeroLicencia = :NumeroLicencia, Cantidad = :Cantidad,
                         CantidadUsada = :CantidadUsada, FechaVencimiento = :FechaVencimiento,
-                        Notas = :Notas, EmpresaId = :EmpresaId, AreaId = :AreaId
+                        Notas = :Notas, EmpresaId = :EmpresaId, RolId = :RolId
                     WHERE Id = :Id AND Estado = 1
                 ");
             $stmt->execute([
@@ -161,7 +161,7 @@ class LicenciaRepository extends BaseRepository
                     ':FechaVencimiento' => $license['FechaVencimiento'],
                     ':Notas' => $license['Notas'],
                     ':EmpresaId' => $license['EmpresaId'],
-                    ':AreaId' => $license['AreaId'],
+                    ':RolId' => $license['RolId'],
                     ':Id' => $id,
             ]);
 

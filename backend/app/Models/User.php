@@ -26,8 +26,7 @@ class User
                    a.Codigo as AgenciaCodigo,
                    car.Nombre as CargoNombre,
                    car.Codigo as CargoCodigo,
-                   ar.Id as AreaId,
-                   ar.Nombre as AreaNombre,
+                   r.Nombre as RolNombre,
                    GROUP_CONCAT(DISTINCT r.Codigo) as RolesCodigos,
                    GROUP_CONCAT(DISTINCT u.RolId) as Roles,
                    GROUP_CONCAT(DISTINCT e.Nombre SEPARATOR ', ') as EmpresasNombres,
@@ -36,7 +35,6 @@ class User
             INNER JOIN gcp_agencias a ON u.AgenciaId = a.Id
             INNER JOIN gcp_ciudades ci ON a.CiudadId = ci.Id
             INNER JOIN gcp_cargos car ON u.CargoId = car.Id
-            INNER JOIN gcp_areas ar ON car.AreaId = ar.Id
             LEFT JOIN gcp_roles r ON u.RolId = r.Id
             LEFT JOIN gcp_usuariosempresas ue ON u.Id = ue.UsuarioId
             LEFT JOIN gcp_empresas e ON ue.EmpresaId = e.Id
@@ -88,8 +86,7 @@ class User
                    a.Codigo as AgenciaCodigo,
                    car.Nombre as CargoNombre,
                    car.Codigo as CargoCodigo,
-                   ar.Id as AreaId,
-                   ar.Nombre as AreaNombre,
+                   r.Nombre as RolNombre,
                    GROUP_CONCAT(DISTINCT r.Codigo) as RolesCodigos,
                    GROUP_CONCAT(DISTINCT u.RolId) as Roles,
                    GROUP_CONCAT(DISTINCT e.Nombre SEPARATOR ', ') as EmpresasNombres,
@@ -98,7 +95,6 @@ class User
             INNER JOIN gcp_agencias a ON u.AgenciaId = a.Id
             INNER JOIN gcp_ciudades ci ON a.CiudadId = ci.Id
             INNER JOIN gcp_cargos car ON u.CargoId = car.Id
-            INNER JOIN gcp_areas ar ON car.AreaId = ar.Id
             LEFT JOIN gcp_roles r ON u.RolId = r.Id
             LEFT JOIN gcp_usuariosempresas ue ON u.Id = ue.UsuarioId
             LEFT JOIN gcp_empresas e ON ue.EmpresaId = e.Id
@@ -165,7 +161,7 @@ class User
             a.Nombre as AgenciaNombre,
             ci.Nombre as AgenciaCiudad,
             a.Codigo as AgenciaCodigo,
-            ar.Nombre as AreaNombre,
+            r.Nombre as RolNombre,
             car.Nombre as CargoNombre,
             car.Codigo as CargoCodigo,
             GROUP_CONCAT(DISTINCT e.Nombre SEPARATOR ', ') as EmpresasNombres
@@ -173,7 +169,7 @@ class User
         INNER JOIN gcp_agencias a ON u.AgenciaId = a.Id
         INNER JOIN gcp_ciudades ci ON a.CiudadId = ci.Id
         INNER JOIN gcp_cargos car ON u.CargoId = car.Id
-        INNER JOIN gcp_areas ar ON car.AreaId = ar.Id
+        LEFT JOIN gcp_roles r ON u.RolId = r.Id
         LEFT JOIN gcp_usuariosempresas ue ON u.Id = ue.UsuarioId
         LEFT JOIN gcp_empresas e ON ue.EmpresaId = e.Id
         WHERE u.Id = :userId
@@ -187,7 +183,15 @@ class User
         return [];
     }
 
-    $companiesStmt = $this->db->prepare("
+    $roleStmt = $this->db->prepare("
+        SELECT r.Codigo FROM gcp_usuarios u INNER JOIN gcp_roles r ON r.Id = u.RolId WHERE u.Id = :userId
+    ");
+    $roleStmt->execute(['userId' => $userId]);
+    $seesAll = in_array($roleStmt->fetchColumn(), ['admin', 'directivos'], true);
+
+    $companiesStmt = $this->db->prepare($seesAll ? "
+        SELECT e.Id, e.Nombre FROM gcp_empresas e WHERE e.Estado = 1 AND :userId > 0 ORDER BY e.Nombre ASC
+    " : "
         SELECT e.Id, e.Nombre
         FROM gcp_usuariosempresas ue
         INNER JOIN gcp_empresas e ON e.Id = ue.EmpresaId

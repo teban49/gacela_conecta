@@ -55,7 +55,7 @@ const WelcomeSection = ({ user }) => {
 
                                 {" · "}
 
-                                {organization.AreaNombre}
+                                {organization.RolNombre}
 
                             </span>
 

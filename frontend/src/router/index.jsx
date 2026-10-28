@@ -9,6 +9,16 @@ import SolicitudesPage from '../modules/solicitudes/pages/SolicitudesPage';
 import GestionPage from '../modules/gestion/pages/GestionPage';
 import PermissionRoute from './PermissionRoute';
 import MainLayout from '../components/MainLayout';
+import { usesExternalGestion, GESTION_EXTERNAL_URL } from '../utils/gestionAccess';
+
+const GestionGuard = ({ children }) => {
+  const { user } = useAuth();
+  if (usesExternalGestion(user)) {
+    window.location.replace(GESTION_EXTERNAL_URL);
+    return null;
+  }
+  return children;
+};
 
 const ProtectedRoute = ({ children }) => {
   const { isAuthenticated, loading } = useAuth();
@@ -83,7 +93,7 @@ const router = createBrowserRouter([
       {
         path: '/dashboard',
         element: (
-          <PermissionRoute requiredPermission="dashboard.ver">
+          <PermissionRoute>
             <DashboardPage />
           </PermissionRoute>
         ),
@@ -132,7 +142,9 @@ const router = createBrowserRouter([
         path: '/gestion',
         element: (
           <PermissionRoute requiredPermission="gestion.incidencias.ver">
-            <GestionPage />
+            <GestionGuard>
+              <GestionPage />
+            </GestionGuard>
           </PermissionRoute>
         ),
       },

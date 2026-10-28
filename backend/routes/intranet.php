@@ -4,6 +4,7 @@ use App\Controllers\Intranet\NoticiaController;
 use App\Controllers\Intranet\DocumentoController;
 use App\Controllers\Intranet\EventoController;
 use App\Controllers\Intranet\IntranetController;
+use App\Controllers\Intranet\OrganigramaPuestoController;
 use App\Core\Router;
 
 Router::get('/api/v1/intranet/home', function () {
@@ -14,11 +15,6 @@ Router::get('/api/v1/intranet/home', function () {
 Router::get('/api/v1/intranet/directorio', function () {
     $controller = new IntranetController();
     $controller->directorio();
-}, ['jwt', 'intranet.ver']);
-
-Router::get('/api/v1/intranet/organigrama', function () {
-    $controller = new IntranetController();
-    $controller->organigrama();
 }, ['jwt', 'intranet.ver']);
 
 Router::get('/api/v1/intranet/calidad/documentos', function () {
@@ -175,3 +171,19 @@ Router::patch('/api/v1/intranet/eventos/{id}/status', function (int $id) {
     $controller = new EventoController();
     $controller->changeStatus($id);
 }, ['jwt', 'intranet.administrar_eventos']);
+Router::get('/api/v1/intranet/organigrama/puestos', function () {
+    (new OrganigramaPuestoController())->index();
+}, ['jwt']);
+
+// Escritura: el controlador exige el rol admin (authorizeAdmin)
+Router::post('/api/v1/intranet/organigrama/puestos', function () {
+    (new OrganigramaPuestoController())->store();
+}, ['jwt']);
+
+Router::put('/api/v1/intranet/organigrama/puestos/{id}', function (int $id) {
+    (new OrganigramaPuestoController())->update($id);
+}, ['jwt']);
+
+Router::delete('/api/v1/intranet/organigrama/puestos/{id}', function (int $id) {
+    (new OrganigramaPuestoController())->destroy($id);
+}, ['jwt']);

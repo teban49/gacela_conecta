@@ -1388,7 +1388,7 @@ php backend/scripts/seed.php
 **Función:** Seed manual con datos básicos del sistema.
 
 **Datos que inserta:**
-- 8 aplicaciones (Dashboard, Intranet, Incidencias, Solicitudes, Inventario, Fondo de Reposición, Seguridad, Configuración)
+- 7 aplicaciones (Dashboard, Intranet, Incidencias, Solicitudes, Inventario, Seguridad, Configuración)
 - 8 roles (Administrador, Analista TI, Supervisor TI, Gerencia, RRHH, Operaciones, Tesorería, Usuario Estándar)
 - 4 permisos de ejemplo
 - Asignación de todos los permisos al rol Administrador

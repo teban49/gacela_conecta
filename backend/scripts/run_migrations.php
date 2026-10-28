@@ -52,7 +52,15 @@ try {
         '022_incident_satisfaction_survey.sql',
         '023_user_read_access.sql',
         '024_usuario_role_permissions.sql',
-        '025_permissions_for_roles_4_to_8.sql'
+        '025_permissions_for_roles_4_to_8.sql',
+        '026_incident_asset_link.sql',
+        '009_create_gcp_intranet_tables.sql',
+        '027_usuario_pruebas_role_remove_fondo.sql',
+        '028_intranet_organigrama_puestos.sql',
+        '029_organigrama_filas_y_copia_estructura.sql',
+        '030_roles_definitivos.sql',
+        '031_eliminar_areas_y_copiar_organigrama.sql',
+        '032_limpieza_tablas_sin_uso.sql'
     ];
     
     foreach ($migrations as $migrationFile) {

@@ -80,6 +80,12 @@ class ActivoController
         Response::success($this->service->getByCategory($categoriaId), 'Activos por categoría obtenidos correctamente.');
     }
 
+    public function myAssets(): void
+    {
+        $user = Auth::user();
+        Response::success($this->service->getByAssignee((int) ($user['id'] ?? 0)), 'Mis activos obtenidos correctamente.');
+    }
+
     public function byAssignee(int $usuarioId): void
     {
         Response::success($this->service->getByAssignee($usuarioId), 'Activos asignados obtenidos correctamente.');
