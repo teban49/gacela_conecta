@@ -30,8 +30,26 @@ class ActivoService
 
     public function respondToAssignment(int $assignmentId, int $usuarioId, bool $accept): array
     {
+        $stmt = $this->repository->getDb()->prepare("
+            SELECT aa.AsignadoPorUsuarioId, a.CodigoInventario
+            FROM gestion_activos_asignaciones aa
+            INNER JOIN gestion_activos a ON a.Id = aa.ActivoId
+            WHERE aa.Id = :Id AND aa.UsuarioId = :UsuarioId AND aa.Estado = 'pendiente'
+        ");
+        $stmt->execute([':Id' => $assignmentId, ':UsuarioId' => $usuarioId]);
+        $assignment = $stmt->fetch(\PDO::FETCH_ASSOC);
+
         if (!$this->repository->respondToAssignment($assignmentId, $usuarioId, $accept)) {
             return ['success' => false, 'message' => 'La solicitud ya no está pendiente o no corresponde a tu usuario.'];
+        }
+        if ($assignment) {
+            (new \App\Repositories\NotificacionRepository())->create(
+                (int) $assignment['AsignadoPorUsuarioId'],
+                $accept ? 'activo_aceptado' : 'activo_rechazado',
+                $accept ? 'Asignación de activo aceptada' : 'Asignación de activo rechazada',
+                "El activo {$assignment['CodigoInventario']} fue " . ($accept ? 'aceptado' : 'rechazado') . ' por el usuario asignado.',
+                '/gestion'
+            );
         }
         return [
             'success' => true,

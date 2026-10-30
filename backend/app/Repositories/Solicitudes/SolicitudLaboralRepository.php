@@ -7,6 +7,146 @@ use PDO;
 
 class SolicitudLaboralRepository extends BaseRepository
 {
+    public const AUX_CARGO = 'Aux Gestión Humana';
+    public const ANALYST_CARGO = 'Analista Nomina';
+
+    /** @return 'aux'|'analista'|null según el cargo del usuario */
+    public function getPayrollRole(int $userId): ?string
+    {
+        $stmt = $this->db->prepare(
+            'SELECT c.Nombre FROM gcp_usuarios u INNER JOIN gcp_cargos c ON c.Id = u.CargoId WHERE u.Id = :Id AND u.Estado = 1'
+        );
+        $stmt->execute([':Id' => $userId]);
+        $name = $stmt->fetchColumn();
+        if ($name === false) {
+            return null;
+        }
+
+        $normalize = static fn (string $value): string => mb_strtolower(
+            strtr($value, ['á' => 'a', 'é' => 'e', 'í' => 'i', 'ó' => 'o', 'ú' => 'u', 'Á' => 'A', 'É' => 'E', 'Í' => 'I', 'Ó' => 'O', 'Ú' => 'U'])
+        );
+        return match ($normalize(trim((string) $name))) {
+            $normalize(self::AUX_CARGO) => 'aux',
+            $normalize(self::ANALYST_CARGO) => 'analista',
+            default => null,
+        };
+    }
+
+    public function getPayrollQueue(string $payrollRole): array
+    {
+        $states = $payrollRole === 'aux'
+            ? ['Pendiente_Liquidacion', 'Con_Errores']
+            : ['Pendiente_Revision_Nomina', 'Pendiente_Pago'];
+        $placeholders = implode(',', array_fill(0, count($states), '?'));
+        $stmt = $this->db->prepare(
+            $this->selectSql() . " WHERE s.EstadoNomina IN ($placeholders) ORDER BY s.FechaActualizacion ASC"
+        );
+        $stmt->execute($states);
+
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
+
+    public function getPayrollState(int $requestId): ?string
+    {
+        $stmt = $this->db->prepare('SELECT EstadoNomina FROM gcp_solicitudes WHERE Id = :Id');
+        $stmt->execute([':Id' => $requestId]);
+        $state = $stmt->fetchColumn();
+
+        return $state === false || $state === null ? null : (string) $state;
+    }
+
+    public function getRequesterId(int $requestId): ?int
+    {
+        $stmt = $this->db->prepare('SELECT UsuarioId FROM gcp_solicitudes WHERE Id = :Id');
+        $stmt->execute([':Id' => $requestId]);
+        $id = $stmt->fetchColumn();
+
+        return $id === false ? null : (int) $id;
+    }
+
+    public function getPayrollDocuments(int $requestId): array
+    {
+        $stmt = $this->db->prepare("
+            SELECT d.Id, d.NombreArchivo, d.FechaSubida, u.Nombres, u.Apellidos
+            FROM gcp_solicitudnomina d
+            INNER JOIN gcp_usuarios u ON u.Id = d.UsuarioId
+            WHERE d.SolicitudId = :SolicitudId
+            ORDER BY d.Id DESC
+        ");
+        $stmt->execute([':SolicitudId' => $requestId]);
+
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
+
+    public function getPayrollDocument(int $requestId, int $documentId): ?array
+    {
+        $stmt = $this->db->prepare(
+            'SELECT NombreArchivo, RutaArchivo FROM gcp_solicitudnomina WHERE Id = :Id AND SolicitudId = :SolicitudId'
+        );
+        $stmt->execute([':Id' => $documentId, ':SolicitudId' => $requestId]);
+        $document = $stmt->fetch(PDO::FETCH_ASSOC);
+
+        return $document ?: null;
+    }
+
+    /**
+     * Cambia el estado de nómina solo si el actual está entre los permitidos.
+     * Devuelve false si el estado no era el esperado (p. ej. otra persona ya lo procesó).
+     */
+    public function transitionPayroll(
+        int $requestId,
+        int $userId,
+        array $fromStates,
+        string $toState,
+        string $historyAction,
+        ?string $comment,
+        ?array $document = null
+    ): bool {
+        $this->db->beginTransaction();
+        try {
+            $lock = $this->db->prepare('SELECT EstadoNomina FROM gcp_solicitudes WHERE Id = :Id FOR UPDATE');
+            $lock->execute([':Id' => $requestId]);
+            $current = $lock->fetchColumn();
+            if ($current === false || !in_array($current, $fromStates, true)) {
+                $this->db->commit();
+                return false;
+            }
+
+            $this->db->prepare('UPDATE gcp_solicitudes SET EstadoNomina = :Estado WHERE Id = :Id')
+                ->execute([':Estado' => $toState, ':Id' => $requestId]);
+
+            if ($document) {
+                $this->db->prepare("
+                    INSERT INTO gcp_solicitudnomina (SolicitudId, UsuarioId, NombreArchivo, RutaArchivo)
+                    VALUES (:SolicitudId, :UsuarioId, :NombreArchivo, :RutaArchivo)
+                ")->execute([
+                    ':SolicitudId' => $requestId,
+                    ':UsuarioId' => $userId,
+                    ':NombreArchivo' => $document['NombreArchivo'],
+                    ':RutaArchivo' => $document['RutaArchivo'],
+                ]);
+            }
+
+            $this->db->prepare("
+                INSERT INTO gcp_solicitudhistorial (SolicitudId, UsuarioId, Accion, Comentario, Nivel)
+                VALUES (:SolicitudId, :UsuarioId, :Accion, :Comentario, 4)
+            ")->execute([
+                ':SolicitudId' => $requestId,
+                ':UsuarioId' => $userId,
+                ':Accion' => $historyAction,
+                ':Comentario' => $comment !== null && $comment !== '' ? $comment : null,
+            ]);
+
+            $this->db->commit();
+            return true;
+        } catch (\Throwable $e) {
+            if ($this->db->inTransaction()) {
+                $this->db->rollBack();
+            }
+            throw $e;
+        }
+    }
+
     public function getTypes(): array
     {
         $stmt = $this->db->query(
@@ -102,7 +242,7 @@ class SolicitudLaboralRepository extends BaseRepository
         return $request;
     }
 
-    public function canView(int $requestId, int $userId, bool $isHr, bool $isManagement): bool
+    public function canView(int $requestId, int $userId, bool $isHr, bool $isManagement, bool $isPayroll = false): bool
     {
         $stmt = $this->db->prepare("
             SELECT COUNT(*)
@@ -110,6 +250,7 @@ class SolicitudLaboralRepository extends BaseRepository
             WHERE s.Id = :Id
               AND (
                     s.UsuarioId = :requesterId
+                 OR (s.EstadoNomina IS NOT NULL AND :isPayroll = 1)
                  OR (
                     s.UsuarioId <> :cargoRequesterId
                     AND s.NivelActual = 1
@@ -137,6 +278,7 @@ class SolicitudLaboralRepository extends BaseRepository
             ':managementRequesterId' => $userId,
             ':isHr' => $isHr ? 1 : 0,
             ':isManagement' => $isManagement ? 1 : 0,
+            ':isPayroll' => $isPayroll ? 1 : 0,
         ]);
 
         return (int) $stmt->fetchColumn() > 0;
@@ -149,9 +291,11 @@ class SolicitudLaboralRepository extends BaseRepository
         try {
             $stmt = $this->db->prepare("
                 INSERT INTO gcp_solicitudes
-                    (UsuarioId, AprobadorCargoId, TipoId, Asunto, Descripcion, FechaInicio, FechaFin, EstadoSolicitud, NivelActual)
+                    (UsuarioId, AprobadorCargoId, TipoId, Asunto, Descripcion, FechaInicio, FechaFin,
+                     FechaReintegro, DiasDinero, DiasDisfrute, PeriodoPendiente, EstadoSolicitud, NivelActual)
                 VALUES
-                    (:UsuarioId, :AprobadorCargoId, :TipoId, :Asunto, :Descripcion, :FechaInicio, :FechaFin, 'Pendiente_Jefe', 1)
+                    (:UsuarioId, :AprobadorCargoId, :TipoId, :Asunto, :Descripcion, :FechaInicio, :FechaFin,
+                     :FechaReintegro, :DiasDinero, :DiasDisfrute, :PeriodoPendiente, 'Pendiente_Jefe', 1)
             ");
             $stmt->execute([
                 ':UsuarioId' => $data['UsuarioId'],
@@ -161,6 +305,10 @@ class SolicitudLaboralRepository extends BaseRepository
                 ':Descripcion' => $data['Descripcion'],
                 ':FechaInicio' => $data['FechaInicio'],
                 ':FechaFin' => $data['FechaFin'],
+                ':FechaReintegro' => $data['FechaReintegro'] ?? null,
+                ':DiasDinero' => $data['DiasDinero'] ?? null,
+                ':DiasDisfrute' => $data['DiasDisfrute'] ?? null,
+                ':PeriodoPendiente' => $data['PeriodoPendiente'] ?? null,
             ]);
             $id = (int) $this->db->lastInsertId();
 
@@ -252,6 +400,7 @@ class SolicitudLaboralRepository extends BaseRepository
                 SET EstadoSolicitud = :EstadoSolicitud,
                     NivelActual = :NivelActual,
                     MotivoRechazo = :MotivoRechazo,
+                    EstadoNomina = :EstadoNomina,
                     FechaActualizacion = CURRENT_TIMESTAMP
                 WHERE Id = :Id
             ");
@@ -259,6 +408,7 @@ class SolicitudLaboralRepository extends BaseRepository
                 ':EstadoSolicitud' => $nextStatus,
                 ':NivelActual' => $nextLevel,
                 ':MotivoRechazo' => $action === 'Rechazada' ? trim($comment) : null,
+                ':EstadoNomina' => $nextStatus === 'Aprobada' ? 'Pendiente_Liquidacion' : null,
                 ':Id' => $requestId,
             ]);
 
@@ -275,7 +425,7 @@ class SolicitudLaboralRepository extends BaseRepository
             ]);
 
             $this->db->commit();
-            return ['EstadoSolicitud' => $nextStatus, 'NivelActual' => $nextLevel];
+            return ['EstadoSolicitud' => $nextStatus, 'NivelActual' => $nextLevel, 'SolicitanteId' => (int) $request['UsuarioId']];
         } catch (\Throwable $e) {
             if ($this->db->inTransaction()) {
                 $this->db->rollBack();
@@ -303,8 +453,10 @@ class SolicitudLaboralRepository extends BaseRepository
             SELECT s.Id, s.UsuarioId, s.AprobadorCargoId, s.TipoId, s.Asunto, s.Descripcion,
                    s.FechaInicio, s.FechaFin, s.EstadoSolicitud, s.NivelActual,
                    s.MotivoRechazo, s.FechaCreacion, s.FechaActualizacion,
+                   s.FechaReintegro, s.DiasDinero, s.DiasDisfrute, s.PeriodoPendiente, s.EstadoNomina,
                    t.Nombre AS TipoNombre, t.Codigo AS TipoCodigo,
                    u.Nombres AS SolicitanteNombres, u.Apellidos AS SolicitanteApellidos,
+                   u.Cedula AS SolicitanteCedula,
                    u.EmailCorporativo AS SolicitanteEmail, u.Telefono AS SolicitanteTelefono,
                    solicitanteCargo.Nombre AS SolicitanteCargo,
                    jefeCargo.Nombre AS JefeAprobadorCargoNombre,

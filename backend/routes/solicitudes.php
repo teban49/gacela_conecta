@@ -111,6 +111,26 @@ Router::post('/api/v1/solicitudes/laborales', function () {
     (new SolicitudLaboralController())->store();
 }, ['jwt']);
 
+Router::get('/api/v1/solicitudes/laborales/nomina', function () {
+    (new SolicitudLaboralController())->payroll();
+}, ['jwt']);
+
+Router::post('/api/v1/solicitudes/laborales/{id}/nomina', function (int $id) {
+    (new SolicitudLaboralController())->uploadPayroll($id);
+}, ['jwt']);
+
+Router::post('/api/v1/solicitudes/laborales/{id}/nomina/revision', function (int $id) {
+    (new SolicitudLaboralController())->reviewPayroll($id);
+}, ['jwt']);
+
+Router::post('/api/v1/solicitudes/laborales/{id}/nomina/pagar', function (int $id) {
+    (new SolicitudLaboralController())->markPaid($id);
+}, ['jwt']);
+
+Router::get('/api/v1/solicitudes/laborales/{id}/nomina/{documentId}', function (int $id, int $documentId) {
+    (new SolicitudLaboralController())->downloadPayroll($id, $documentId);
+}, ['jwt']);
+
 Router::get('/api/v1/solicitudes/laborales/{id}/adjuntos/{attachmentId}', function (int $id, int $attachmentId) {
     (new SolicitudLaboralController())->download($id, $attachmentId);
 }, ['jwt']);

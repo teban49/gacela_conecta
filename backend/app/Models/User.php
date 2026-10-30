@@ -156,6 +156,7 @@ class User
             u.Id as UsuarioId,
             u.Nombres,
             u.Apellidos,
+            u.Cedula,
             u.EmailCorporativo,
             u.Telefono,
             a.Nombre as AgenciaNombre,

@@ -103,6 +103,74 @@ class SolicitudLaboralController
         Response::success($result['data'], $result['message']);
     }
 
+    public function payroll(): void
+    {
+        $user = $this->authenticatedUser();
+        Response::success($this->service->getPayrollQueue((int) $user['id']), 'Solicitudes de nómina obtenidas correctamente.');
+    }
+
+    public function uploadPayroll(int $id): void
+    {
+        $user = $this->authenticatedUser();
+        $upload = $this->storeUploadedFile($_FILES['Documento'] ?? null, true);
+        if ($upload === null) {
+            Response::validationError(['Documento' => ['Adjunta el documento de liquidación.']], 'Falta el documento.');
+            return;
+        }
+        if (isset($upload['error'])) {
+            Response::validationError(['Documento' => [$upload['error']]], 'No se pudo adjuntar el archivo.');
+            return;
+        }
+
+        try {
+            $result = $this->service->uploadPayrollDocument($id, (int) $user['id'], $upload);
+        } catch (\Throwable $e) {
+            $this->removeStoredFile($upload['RutaArchivo']);
+            throw $e;
+        }
+        if (!$result['success']) {
+            $this->removeStoredFile($upload['RutaArchivo']);
+            Response::error($result['message'], [], $result['status'] ?? 400);
+            return;
+        }
+
+        Response::success([], $result['message']);
+    }
+
+    public function reviewPayroll(int $id): void
+    {
+        $user = $this->authenticatedUser();
+        $data = Request::json();
+        $comment = is_string($data['Comentario'] ?? null) ? trim($data['Comentario']) : '';
+        $result = $this->service->reviewPayroll($id, (int) $user['id'], ($data['Decision'] ?? '') === 'OK', $comment);
+
+        $result['success']
+            ? Response::success([], $result['message'])
+            : Response::error($result['message'], [], $result['status'] ?? 400);
+    }
+
+    public function markPaid(int $id): void
+    {
+        $user = $this->authenticatedUser();
+        $result = $this->service->markPaid($id, (int) $user['id']);
+
+        $result['success']
+            ? Response::success([], $result['message'])
+            : Response::error($result['message'], [], $result['status'] ?? 400);
+    }
+
+    public function downloadPayroll(int $id, int $documentId): void
+    {
+        $user = $this->authenticatedUser();
+        $document = $this->service->getPayrollDocument($id, $documentId, (int) $user['id']);
+        if (!$document) {
+            Response::notFound('Documento no encontrado o no tienes acceso.');
+            return;
+        }
+
+        $this->streamFile($document);
+    }
+
     public function download(int $id, int $attachmentId): void
     {
         $user = $this->authenticatedUser();
@@ -118,6 +186,11 @@ class SolicitudLaboralController
             return;
         }
 
+        $this->streamFile($attachment);
+    }
+
+    private function streamFile(array $attachment): void
+    {
         $backendRoot = dirname(__DIR__, 3);
         $path = $backendRoot . DIRECTORY_SEPARATOR . str_replace(
             ['/', '\\'],
@@ -130,7 +203,13 @@ class SolicitudLaboralController
         }
 
         $extension = strtolower(pathinfo($path, PATHINFO_EXTENSION));
-        $contentTypes = ['pdf' => 'application/pdf', 'png' => 'image/png', 'jpg' => 'image/jpeg'];
+        $contentTypes = [
+            'pdf' => 'application/pdf',
+            'png' => 'image/png',
+            'jpg' => 'image/jpeg',
+            'xlsx' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            'xls' => 'application/vnd.ms-excel',
+        ];
         header('Content-Type: ' . ($contentTypes[$extension] ?? 'application/octet-stream'));
         header('Content-Length: ' . (string) filesize($path));
         header('Content-Disposition: attachment; filename="' . basename($attachment['NombreArchivo']) . '"');
@@ -156,7 +235,7 @@ class SolicitudLaboralController
         )));
     }
 
-    private function storeUploadedFile(?array $file): ?array
+    private function storeUploadedFile(?array $file, bool $allowSpreadsheets = false): ?array
     {
         if (!$file || ($file['error'] ?? UPLOAD_ERR_NO_FILE) === UPLOAD_ERR_NO_FILE) {
             return null;
@@ -178,14 +257,19 @@ class SolicitudLaboralController
             return ['error' => 'No fue posible validar el archivo adjunto.'];
         }
 
+        $originalExtension = strtolower(pathinfo((string) $file['name'], PATHINFO_EXTENSION));
         $extension = match (true) {
             str_starts_with($signature, '%PDF-') => 'pdf',
             $signature === "\x89PNG\r\n\x1a\n" => 'png',
             str_starts_with($signature, "\xFF\xD8\xFF") => 'jpg',
+            $allowSpreadsheets && $originalExtension === 'xlsx' && str_starts_with($signature, "PK\x03\x04") => 'xlsx',
+            $allowSpreadsheets && $originalExtension === 'xls' && str_starts_with($signature, "\xD0\xCF\x11\xE0") => 'xls',
             default => null,
         };
         if ($extension === null) {
-            return ['error' => 'Solo se permiten archivos PDF, JPG o PNG.'];
+            return ['error' => $allowSpreadsheets
+                ? 'Solo se permiten archivos PDF, Excel, JPG o PNG.'
+                : 'Solo se permiten archivos PDF, JPG o PNG.'];
         }
 
         $relativeDirectory = 'storage' . DIRECTORY_SEPARATOR . 'solicitudes';

@@ -60,7 +60,8 @@ try {
         '029_organigrama_filas_y_copia_estructura.sql',
         '030_roles_definitivos.sql',
         '031_eliminar_areas_y_copiar_organigrama.sql',
-        '032_limpieza_tablas_sin_uso.sql'
+        '032_limpieza_tablas_sin_uso.sql',
+        '033_cedula_nomina_notificaciones.sql'
     ];
     
     foreach ($migrations as $migrationFile) {

@@ -17,7 +17,7 @@ class UserRepository extends BaseRepository
                    a.CiudadId, c.RolId AS CargoRolId,
                    MIN(ue.EmpresaId) AS EmpresaId,
                    GROUP_CONCAT(DISTINCT ue.EmpresaId ORDER BY ue.EmpresaId) AS EmpresasIds,
-                   u.Nombres, u.Apellidos, u.EmailCorporativo, u.Telefono, u.Estado,
+                   u.Nombres, u.Apellidos, u.Cedula, u.EmailCorporativo, u.Telefono, u.Estado,
                    r.Id AS RolId,
                    r.Nombre AS RolNombre,
                    r.Codigo AS RolCodigo,
@@ -91,11 +91,11 @@ class UserRepository extends BaseRepository
     public function create(array $user): int
     {
         $sql = "
-            INSERT INTO {$this->table} (AgenciaId, CargoId, RolId, CargoJefeDirectoId, Nombres, Apellidos, EmailCorporativo, Telefono, Estado)
+            INSERT INTO {$this->table} (AgenciaId, CargoId, RolId,             CargoJefeDirectoId, Nombres, Apellidos, Cedula, EmailCorporativo, Telefono, Estado)
             VALUES (
                 :AgenciaId, :CargoId,
                 (SELECT Id FROM gcp_roles WHERE Codigo = 'usuario' AND Estado = 1 LIMIT 1),
-                :CargoJefeDirectoId, :Nombres, :Apellidos, :EmailCorporativo, :Telefono, :Estado
+                            :CargoJefeDirectoId, :Nombres, :Apellidos, :Cedula, :EmailCorporativo, :Telefono, :Estado
             )
         ";
 
@@ -109,6 +109,7 @@ class UserRepository extends BaseRepository
                 ':CargoJefeDirectoId' => $this->normalizeManagerCargoId($user['CargoJefeDirectoId'] ?? null),
                 ':Nombres' => $user['Nombres'],
                 ':Apellidos' => $user['Apellidos'],
+                ':Cedula' => $this->normalizeCedula($user['Cedula'] ?? null),
                 ':EmailCorporativo' => $user['EmailCorporativo'],
                 ':Telefono' => $user['Telefono'] ?? null,
                 ':Estado' => $user['Estado'] ?? 1,
@@ -137,6 +138,7 @@ class UserRepository extends BaseRepository
                 CargoJefeDirectoId = :CargoJefeDirectoId,
                 Nombres = :Nombres,
                 Apellidos = :Apellidos,
+                Cedula = :Cedula,
                 EmailCorporativo = :EmailCorporativo,
                 Telefono = :Telefono,
                 Estado = :Estado
@@ -156,6 +158,7 @@ class UserRepository extends BaseRepository
                 ':CargoJefeDirectoId' => $this->normalizeManagerCargoId($user['CargoJefeDirectoId'] ?? null),
                 ':Nombres' => $user['Nombres'],
                 ':Apellidos' => $user['Apellidos'],
+                ':Cedula' => $this->normalizeCedula($user['Cedula'] ?? null),
                 ':EmailCorporativo' => $user['EmailCorporativo'],
                 ':Telefono' => $user['Telefono'] ?? null,
                 ':Estado' => $user['Estado'] ?? 1,
@@ -193,6 +196,12 @@ class UserRepository extends BaseRepository
         }
 
         return array_values(array_unique($normalizedIds));
+    }
+
+    private function normalizeCedula(mixed $cedula): ?string
+    {
+        $value = is_scalar($cedula) ? preg_replace('/\D+/', '', (string) $cedula) : '';
+        return $value === '' ? null : substr($value, 0, 20);
     }
 
     private function normalizeManagerCargoId(mixed $cargoId): ?int
