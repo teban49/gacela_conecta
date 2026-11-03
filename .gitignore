@@ -29,3 +29,6 @@ Thumbs.db
 .DS_Store
 .idea/
 .vscode/
+
+# Videos pesados (superan el limite de GitHub)
+frontend/public/media/intranet/pildoras/
