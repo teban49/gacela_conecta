@@ -8,7 +8,7 @@ use PDO;
 class SolicitudLaboralRepository extends BaseRepository
 {
     public const AUX_CARGO = 'Aux Gestión Humana';
-    public const ANALYST_CARGO = 'Analista Nomina';
+    public const ANALYST_CARGO = 'Analista Nómina';
 
     /** @return 'aux'|'analista'|null según el cargo del usuario */
     public function getPayrollRole(int $userId): ?string
@@ -178,6 +178,20 @@ class SolicitudLaboralRepository extends BaseRepository
         return $cargoId === false || $cargoId === null ? null : (int) $cargoId;
     }
 
+    public function getUserCompanies(int $userId): array
+    {
+        $stmt = $this->db->prepare('
+            SELECT e.Id, e.Nombre, e.Codigo
+            FROM gcp_usuariosempresas ue
+            INNER JOIN gcp_empresas e ON e.Id = ue.EmpresaId AND e.Estado = 1
+            WHERE ue.UsuarioId = :UsuarioId
+            ORDER BY e.Id
+        ');
+        $stmt->execute([':UsuarioId' => $userId]);
+
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
+
     public function getMine(int $userId): array
     {
         $stmt = $this->db->prepare($this->selectSql() . ' WHERE s.UsuarioId = :userId ORDER BY s.FechaCreacion DESC');
@@ -291,10 +305,10 @@ class SolicitudLaboralRepository extends BaseRepository
         try {
             $stmt = $this->db->prepare("
                 INSERT INTO gcp_solicitudes
-                    (UsuarioId, AprobadorCargoId, TipoId, Asunto, Descripcion, FechaInicio, FechaFin,
+                        (UsuarioId, AprobadorCargoId, TipoId, Asunto, Descripcion, FechaInicio, FechaFin, EmpresaSolicitudId,
                      FechaReintegro, DiasDinero, DiasDisfrute, PeriodoPendiente, EstadoSolicitud, NivelActual)
                 VALUES
-                    (:UsuarioId, :AprobadorCargoId, :TipoId, :Asunto, :Descripcion, :FechaInicio, :FechaFin,
+                        (:UsuarioId, :AprobadorCargoId, :TipoId, :Asunto, :Descripcion, :FechaInicio, :FechaFin, :EmpresaSolicitudId,
                      :FechaReintegro, :DiasDinero, :DiasDisfrute, :PeriodoPendiente, 'Pendiente_Jefe', 1)
             ");
             $stmt->execute([
@@ -305,6 +319,7 @@ class SolicitudLaboralRepository extends BaseRepository
                 ':Descripcion' => $data['Descripcion'],
                 ':FechaInicio' => $data['FechaInicio'],
                 ':FechaFin' => $data['FechaFin'],
+                ':EmpresaSolicitudId' => $data['EmpresaSolicitudId'] ?? null,
                 ':FechaReintegro' => $data['FechaReintegro'] ?? null,
                 ':DiasDinero' => $data['DiasDinero'] ?? null,
                 ':DiasDisfrute' => $data['DiasDisfrute'] ?? null,
@@ -460,9 +475,25 @@ class SolicitudLaboralRepository extends BaseRepository
                    u.EmailCorporativo AS SolicitanteEmail, u.Telefono AS SolicitanteTelefono,
                    solicitanteCargo.Nombre AS SolicitanteCargo,
                    jefeCargo.Nombre AS JefeAprobadorCargoNombre,
+                   COALESCE(s.EmpresaSolicitudId, (SELECT ue.EmpresaId FROM gcp_usuariosempresas ue
+                    WHERE ue.UsuarioId = s.UsuarioId ORDER BY ue.EmpresaId LIMIT 1)) AS EmpresaId,
                    (SELECT e.Nombre FROM gcp_usuariosempresas ue
                     INNER JOIN gcp_empresas e ON e.Id = ue.EmpresaId
-                    WHERE ue.UsuarioId = s.UsuarioId ORDER BY e.Id LIMIT 1) AS EmpresaNombre
+                    WHERE ue.UsuarioId = s.UsuarioId
+                      AND ue.EmpresaId = COALESCE(s.EmpresaSolicitudId, (
+                        SELECT ueEmpresa.EmpresaId FROM gcp_usuariosempresas ueEmpresa
+                        WHERE ueEmpresa.UsuarioId = s.UsuarioId ORDER BY ueEmpresa.EmpresaId LIMIT 1
+                      ))
+                    ORDER BY e.Id LIMIT 1) AS EmpresaNombre,
+                   (SELECT CONCAT(gerente.Nombres, ' ', gerente.Apellidos)
+                    FROM gcp_usuariosempresas ueGerencia
+                    INNER JOIN gcp_usuarios gerente ON gerente.Id = ueGerencia.UsuarioId AND gerente.Estado = 1
+                    INNER JOIN gcp_cargos cargoGerencia ON cargoGerencia.Id = gerente.CargoId AND cargoGerencia.Nombre = 'Gerencia'
+                    WHERE ueGerencia.EmpresaId = COALESCE(s.EmpresaSolicitudId, (
+                        SELECT ueEmpresa.EmpresaId FROM gcp_usuariosempresas ueEmpresa
+                        WHERE ueEmpresa.UsuarioId = s.UsuarioId ORDER BY ueEmpresa.EmpresaId LIMIT 1
+                    ))
+                    ORDER BY gerente.Id LIMIT 1) AS GerenteNombre
             FROM gcp_solicitudes s
             INNER JOIN gcp_solicitudtipos t ON t.Id = s.TipoId
             INNER JOIN gcp_usuarios u ON u.Id = s.UsuarioId

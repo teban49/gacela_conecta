@@ -390,6 +390,7 @@ const SecurityPage = () => {
       CargoId: 1,
       Nombres: '',
       Apellidos: '',
+      Cedula: '',
       EmailCorporativo: '',
       Telefono: '',
       CargoJefeDirectoId: '',
@@ -408,6 +409,7 @@ const SecurityPage = () => {
       CargoId: user.CargoId || 1,
       Nombres: user.Nombres,
       Apellidos: user.Apellidos,
+      Cedula: user.Cedula || '',
       EmailCorporativo: user.EmailCorporativo,
       Telefono: user.Telefono || '',
       CargoJefeDirectoId: user.CargoJefeDirectoId ? String(user.CargoJefeDirectoId) : '',
@@ -914,6 +916,16 @@ const SecurityPage = () => {
                   type="text"
                   value={formData.Apellidos}
                   onChange={(e) => setFormData({...formData, Apellidos: e.target.value})}
+                  className="w-full rounded-xl border border-slate-300 px-4 py-2 focus:border-orange-500 focus:outline-none"
+                />
+              </div>
+              <div>
+                <label className="mb-1 block text-sm font-medium text-slate-700">Cédula de ciudadanía</label>
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  value={formData.Cedula ?? ''}
+                  onChange={(e) => setFormData({...formData, Cedula: e.target.value.replace(/\D/g, '')})}
                   className="w-full rounded-xl border border-slate-300 px-4 py-2 focus:border-orange-500 focus:outline-none"
                 />
               </div>

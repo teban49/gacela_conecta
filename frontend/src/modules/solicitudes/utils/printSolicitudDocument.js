@@ -12,7 +12,7 @@ const formatDate = (value) => {
 
 const formatDateTime = (value) => (value ? new Date(String(value).replace(' ', 'T')).toLocaleString('es-CO') : '—');
 
-const STAGES = { 1: 'Jefe directo', 2: 'Recursos Humanos', 3: 'Gerencia' };
+const STAGES = { 1: 'Jefe directo', 2: 'Recursos Humanos', 3: 'Gerencia', 4: 'Nómina' };
 
 // Imágenes en frontend/public/media/solicitudes/; si no existen, se ocultan.
 const IMAGE_BASE = '/media/solicitudes';
@@ -153,34 +153,51 @@ const buildPermissionFormHtml = (request) => {
   return wrapForm(request, `${copy()}<div class="cut"></div>${copy()}<div class="record">${escapeHtml(ctx.approvalRecord)}</div>`, ctx);
 };
 
+const normalizeText = (value) => String(value ?? '')
+  .normalize('NFD')
+  .replace(/[\u0300-\u036f]/g, '')
+  .toLowerCase()
+  .trim();
+
 const buildVacationFormHtml = (request) => {
   const ctx = documentContext(request);
-  const days = daysBetween(request.FechaInicio, request.FechaFin);
+  const isDriver = normalizeText(request.SolicitanteCargo) === 'conductor';
+  const cashDays = Number(request.DiasDinero ?? 0);
+  const enjoyDays = Number(request.DiasDisfrute ?? 0);
+  const hasSplit = request.DiasDinero != null || request.DiasDisfrute != null;
+  const days = hasSplit && cashDays + enjoyDays > 0
+    ? cashDays + enjoyDays
+    : daysBetween(request.FechaInicio, request.FechaFin);
+  const cedula = request.SolicitanteCedula ?? '';
+  const vehicleCell = isDriver
+    ? '<th>N° interno del vehículo</th><td colspan="2"></td>'
+    : '';
+  const cargoValueSpan = isDriver ? 2 : 5;
+  const vehicleText = isDriver
+    ? ` propietario (&nbsp;&nbsp;&nbsp;&nbsp;)/administrador (&nbsp;&nbsp;&nbsp;&nbsp;) del vehículo con
+      número interno ________________`
+    : '';
   const body = `
     ${formHeader(ctx, 'Solicitud de Vacaciones', 'HUMANA-FOR-018', 'Versión. 07', 'Fecha de Vigencia. 05/09/2025')}
     <table style="margin-top:10px">
       <tr><th style="width:22%">Fecha de solicitud:</th><td colspan="5">${escapeHtml(formatDate(request.FechaCreacion))}</td></tr>
       <tr><th>Nombres y Apellidos</th><td colspan="5">${escapeHtml(ctx.solicitante)}</td></tr>
-      <tr><th>Cédula de ciudadanía</th><td colspan="5"></td></tr>
+      <tr><th>Cédula de ciudadanía</th><td colspan="5">${escapeHtml(cedula)}</td></tr>
       <tr><th>Correo electrónico</th><td colspan="2">${escapeHtml(request.SolicitanteEmail ?? '')}</td><th>Número de celular</th><td colspan="2">${escapeHtml(request.SolicitanteTelefono ?? '')}</td></tr>
-      <tr><th>Cargo</th><td colspan="2">${escapeHtml(request.SolicitanteCargo ?? '')}</td><th>N° interno del vehículo</th><td colspan="2"></td></tr>
-      <tr><th>Periodo solicitado</th><td></td><th>Fecha Ingreso</th><td></td><th>Días solicitados</th><td>${days ?? ''}</td></tr>
-      <tr><th>En Dinero</th><td></td><th>En Disfrute</th><td></td><th>Día de inicio</th><td>${escapeHtml(formatDate(request.FechaInicio))}</td></tr>
+      <tr><th>Cargo</th><td colspan="${cargoValueSpan}">${escapeHtml(request.SolicitanteCargo ?? '')}</td>${vehicleCell}</tr>
+      <tr><th>Periodo solicitado</th><td></td><th>Fecha Ingreso</th><td>${escapeHtml(request.FechaReintegro ? formatDate(request.FechaReintegro) : '')}</td><th>Días solicitados</th><td>${days ?? ''}</td></tr>
+      <tr><th>En Dinero</th><td>${hasSplit ? cashDays : ''}</td><th>En Disfrute</th><td>${hasSplit ? enjoyDays : ''}</td><th>Día de inicio</th><td>${escapeHtml(formatDate(request.FechaInicio))}</td></tr>
       <tr><th>Día de Termino</th><td colspan="5">${escapeHtml(formatDate(request.FechaFin))}</td></tr>
-      <tr><th>Período pendiente</th><td colspan="5"></td></tr>
-      <tr><td colspan="6" class="section">DIAS PENDIENTES</td></tr>
-      <tr><th>SI</th><td></td><th>NO</th><td></td><th>Total días pendientes</th><td></td></tr>
-      <tr><td colspan="6" style="height:16px">CC: Hoja de Vida</td></tr>
+      <tr><th>Período pendiente</th><td colspan="5">${escapeHtml(request.PeriodoPendiente ?? '')}</td></tr>
     </table>
     <p style="margin:34px 0 0;line-height:2;text-align:justify">
       Yo <u>${escapeHtml(ctx.solicitante) || '&nbsp;'.repeat(40)}</u>, identificado con número de cédula
-      ______________________________ propietario (&nbsp;&nbsp;&nbsp;&nbsp;)/administrador (&nbsp;&nbsp;&nbsp;&nbsp;) del vehículo con
-      número interno ________________ autorizo la presente solicitud de vacaciones.
+      <u>${escapeHtml(cedula) || '&nbsp;'.repeat(30)}</u>${vehicleText} autorizo la presente solicitud de vacaciones.
     </p>
     <div class="sigs" style="margin-top:80px">
       ${signatureBlock('Firma Trabajador', ctx.solicitante, null, ctx, request)}
-      ${signatureBlock('Vo.Bo. Propietario y/o Administrador', '', null, ctx, request)}
-      ${signatureBlock('Vo. Bo. Director Operativo', '', 1, ctx, request)}
+      ${isDriver ? signatureBlock('Vo.Bo. Propietario y/o Administrador', '', null, ctx, request) : ''}
+      ${signatureBlock('Vo. Bo. Jefe inmediato', '', 1, ctx, request)}
       ${signatureBlock('Vo.Bo. Gerente', '', 3, ctx, request)}
     </div>
     <div class="record">${escapeHtml(ctx.approvalRecord)}</div>`;

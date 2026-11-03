@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import {
-  CalendarDays, CheckCircle2, Clock3, Download, FileText, Paperclip,
-  Plus, Search, Send, X, XCircle
+  Banknote, CalendarDays, CheckCircle2, Clock3, Download, FileText, Paperclip,
+  Plus, Search, Send, Upload, X, XCircle
 } from 'lucide-react';
 import { solicitudesAPI } from '../services/solicitudesAPI';
 import { useAuth } from '../../../contexts/AuthContext';
@@ -21,6 +22,22 @@ const STATUS_STYLES = {
   Pendiente_Gerencia: 'bg-violet-50 text-violet-800 border-violet-200',
   Aprobada: 'bg-emerald-50 text-emerald-800 border-emerald-200',
   Rechazada: 'bg-red-50 text-red-800 border-red-200',
+};
+
+const PAYROLL_LABELS = {
+  Pendiente_Liquidacion: 'En liquidación de nómina',
+  Pendiente_Revision_Nomina: 'En liquidación de nómina',
+  Con_Errores: 'En liquidación de nómina',
+  Pendiente_Pago: 'Pendiente de pago',
+  Pagada: 'Pagada',
+};
+
+const PAYROLL_STAFF_LABELS = {
+  Pendiente_Liquidacion: 'Pendiente de liquidación',
+  Pendiente_Revision_Nomina: 'Pendiente de revisión',
+  Con_Errores: 'Liquidación con errores',
+  Pendiente_Pago: 'Pendiente de pago',
+  Pagada: 'Pagada',
 };
 
 const formatDate = (date) => {
@@ -52,14 +69,24 @@ const SolicitudesPage = () => {
   const [decisionComment, setDecisionComment] = useState('');
   const [decisionError, setDecisionError] = useState('');
   const [detailError, setDetailError] = useState('');
-  const [formData, setFormData] = useState({
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [payrollRole, setPayrollRole] = useState(null);
+  const [payrollRequests, setPayrollRequests] = useState([]);
+  const [payrollFile, setPayrollFile] = useState(null);
+  const [payrollComment, setPayrollComment] = useState('');
+  const emptyForm = {
     TipoId: '',
     Asunto: '',
     Descripcion: '',
     FechaInicio: '',
     FechaFin: '',
+    FechaReintegro: '',
+    DiasDinero: '0',
+    DiasDisfrute: '0',
+    PeriodoPendiente: '',
     Adjunto: null,
-  });
+  };
+  const [formData, setFormData] = useState(emptyForm);
 
   const canReviewByRole = hasRole('rrhh') || hasRole('gerencia');
   const canReview = canReviewByRole || pendingRequests.length > 0;
@@ -78,6 +105,14 @@ const SolicitudesPage = () => {
       setTypes(loadedTypes);
       setMyRequests(mineResponse.data?.data ?? []);
       setPendingRequests(pendingResponse.data?.data ?? []);
+      try {
+        const payrollResponse = await solicitudesAPI.getPayrollRequests();
+        setPayrollRole(payrollResponse.data?.data?.Rol ?? null);
+        setPayrollRequests(payrollResponse.data?.data?.Solicitudes ?? []);
+      } catch {
+        setPayrollRole(null);
+        setPayrollRequests([]);
+      }
       setFormData((current) => ({
         ...current,
         TipoId: current.TipoId || (loadedTypes[0] ? String(loadedTypes[0].Id) : ''),
@@ -94,8 +129,21 @@ const SolicitudesPage = () => {
     loadData();
   }, []);
 
+  // Deep links desde el centro de notificaciones: ?tab=...&id=...
+  useEffect(() => {
+    const tab = searchParams.get('tab');
+    const id = searchParams.get('id');
+    if (tab === 'pending' || tab === 'payroll') setActiveTab(tab);
+    if (id) {
+      openDetails({ Id: id });
+    }
+    if (tab || id) setSearchParams({}, { replace: true });
+  }, [searchParams]);
+
   const visibleRequests = useMemo(() => {
-    const requests = activeTab === 'pending' ? pendingRequests : myRequests;
+    const requests = activeTab === 'pending'
+      ? pendingRequests
+      : activeTab === 'payroll' ? payrollRequests : myRequests;
     const query = search.trim().toLocaleLowerCase();
     if (!query) return requests;
     return requests.filter((request) =>
@@ -103,13 +151,15 @@ const SolicitudesPage = () => {
         .filter(Boolean)
         .some((value) => value.toLocaleLowerCase().includes(query))
     );
-  }, [activeTab, myRequests, pendingRequests, search]);
+  }, [activeTab, myRequests, pendingRequests, payrollRequests, search]);
 
   const openDetails = async (request) => {
     setDetailLoading(true);
     setDecisionError('');
     setDetailError('');
     setDecisionComment('');
+    setPayrollFile(null);
+    setPayrollComment('');
     try {
       const response = await solicitudesAPI.getLaboralRequest(request.Id);
       setSelectedRequest(response.data?.data ?? null);
@@ -132,16 +182,18 @@ const SolicitudesPage = () => {
     body.append('FechaInicio', formData.FechaInicio);
     body.append('FechaFin', formData.FechaFin);
     if (formData.Adjunto) body.append('Adjunto', formData.Adjunto);
+    if (activeType?.Codigo === 'vacaciones') {
+      body.append('FechaReintegro', formData.FechaReintegro);
+      body.append('DiasDinero', formData.DiasDinero || '0');
+      body.append('DiasDisfrute', formData.DiasDisfrute || '0');
+      body.append('PeriodoPendiente', formData.PeriodoPendiente.trim());
+    }
 
     try {
       await solicitudesAPI.createLaboralRequest(body);
       setFormData((current) => ({
-        ...current,
-        Asunto: '',
-        Descripcion: '',
-        FechaInicio: '',
-        FechaFin: '',
-        Adjunto: null,
+        ...emptyForm,
+        TipoId: current.TipoId,
       }));
       await loadData();
       setActiveTab('mine');
@@ -168,6 +220,36 @@ const SolicitudesPage = () => {
       setDecisionError(getErrorMessage(error, 'No fue posible registrar la decisión.'));
     } finally {
       setSaving(false);
+    }
+  };
+
+  const runPayrollAction = async (action, fallback) => {
+    setSaving(true);
+    setDetailError('');
+    try {
+      await action();
+      setSelectedRequest(null);
+      await loadData();
+    } catch (error) {
+      setDetailError(getErrorMessage(error, fallback));
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const downloadPayrollDoc = async (doc) => {
+    try {
+      const response = await solicitudesAPI.downloadPayrollDocument(selectedRequest.Id, doc.Id);
+      const url = URL.createObjectURL(response.data);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = doc.NombreArchivo;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+    } catch (error) {
+      setDetailError(error.response?.data?.message || 'No fue posible descargar el archivo.');
     }
   };
 
@@ -215,7 +297,9 @@ const SolicitudesPage = () => {
         </div>
         <span className={`inline-flex shrink-0 items-center gap-1 rounded-full border px-3 py-1.5 text-xs font-semibold ${STATUS_STYLES[request.EstadoSolicitud] || 'border-slate-200 bg-slate-50 text-slate-700'}`}>
           <Clock3 size={14} />
-          {STATUS_LABELS[request.EstadoSolicitud] || request.EstadoSolicitud}
+          {request.EstadoSolicitud === 'Aprobada' && request.EstadoNomina
+            ? (activeTab === 'payroll' ? PAYROLL_STAFF_LABELS : PAYROLL_LABELS)[request.EstadoNomina]
+            : STATUS_LABELS[request.EstadoSolicitud] || request.EstadoSolicitud}
         </span>
       </div>
     </button>
@@ -297,6 +381,63 @@ const SolicitudesPage = () => {
             </label>
           </>
         )}
+        {activeType?.Codigo === 'vacaciones' && (
+          <>
+            <label className="text-sm font-semibold text-slate-700">
+              Cédula de ciudadanía
+              <input
+                readOnly
+                value={user?.cedula ?? ''}
+                placeholder="Sin cédula registrada"
+                className="mt-2 w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 font-normal"
+              />
+              {!user?.cedula && <span className="mt-1 block text-xs font-normal text-amber-700">Pide a Gestión Humana que registre tu cédula.</span>}
+            </label>
+            <label className="text-sm font-semibold text-slate-700">
+              Fecha de reintegro al trabajo <span className="text-red-600">*</span>
+              <input
+                type="date"
+                required
+                min={formData.FechaFin || undefined}
+                value={formData.FechaReintegro}
+                onChange={(event) => setFormData({ ...formData, FechaReintegro: event.target.value })}
+                className="mt-2 w-full rounded-xl border border-slate-200 px-4 py-3"
+              />
+            </label>
+            <label className="text-sm font-semibold text-slate-700">
+              Días en dinero
+              <input
+                type="number"
+                min="0"
+                step="1"
+                value={formData.DiasDinero}
+                onChange={(event) => setFormData({ ...formData, DiasDinero: event.target.value })}
+                className="mt-2 w-full rounded-xl border border-slate-200 px-4 py-3"
+              />
+            </label>
+            <label className="text-sm font-semibold text-slate-700">
+              Días en disfrute
+              <input
+                type="number"
+                min="0"
+                step="1"
+                value={formData.DiasDisfrute}
+                onChange={(event) => setFormData({ ...formData, DiasDisfrute: event.target.value })}
+                className="mt-2 w-full rounded-xl border border-slate-200 px-4 py-3"
+              />
+            </label>
+            <label className="text-sm font-semibold text-slate-700 sm:col-span-2">
+              ¿Tienes algún período pendiente?
+              <input
+                maxLength={255}
+                value={formData.PeriodoPendiente}
+                onChange={(event) => setFormData({ ...formData, PeriodoPendiente: event.target.value })}
+                placeholder="Ej: 2023-2024 (déjalo vacío si no tienes)"
+                className="mt-2 w-full rounded-xl border border-slate-200 px-4 py-3 font-normal"
+              />
+            </label>
+          </>
+        )}
         {Number(activeType?.RequiereAdjunto) === 1 && (
           <label className="text-sm font-semibold text-slate-700 sm:col-span-2">
             Archivo adjunto <span className="text-red-600">*</span>
@@ -348,6 +489,12 @@ const SolicitudesPage = () => {
             {pendingRequests.length > 0 && <span className="rounded-full bg-white/20 px-2 py-0.5 text-xs">{pendingRequests.length}</span>}
           </button>
         )}
+        {payrollRole && (
+          <button onClick={() => setActiveTab('payroll')} className={`inline-flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold ${activeTab === 'payroll' ? 'bg-orange-600 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}>
+            <Banknote size={16} /> Nómina
+            {payrollRequests.length > 0 && <span className="rounded-full bg-white/20 px-2 py-0.5 text-xs">{payrollRequests.length}</span>}
+          </button>
+        )}
         {canCreate && (
           <button onClick={() => setActiveTab('create')} className={`inline-flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold ${activeTab === 'create' ? 'bg-orange-600 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}>
             <Plus size={16} /> Crear
@@ -374,7 +521,9 @@ const SolicitudesPage = () => {
             <div className="space-y-3">{visibleRequests.map(renderRequestCard)}</div>
           ) : (
             <div className="rounded-2xl border border-dashed border-slate-300 bg-white py-16 text-center text-slate-500">
-              {activeTab === 'pending' ? 'No tienes solicitudes pendientes de aprobación.' : 'Aún no has creado solicitudes.'}
+              {activeTab === 'pending' ? 'No tienes solicitudes pendientes de aprobación.'
+                : activeTab === 'payroll' ? 'No hay solicitudes en proceso de nómina.'
+                : 'Aún no has creado solicitudes.'}
             </div>
           )}
         </>
@@ -404,6 +553,83 @@ const SolicitudesPage = () => {
                   <div className="rounded-xl bg-slate-50 p-4"><div className="text-xs font-semibold uppercase text-slate-500">Fechas solicitadas</div><div className="mt-1 font-medium">{formatDate(selectedRequest.FechaInicio)} – {formatDate(selectedRequest.FechaFin)}</div></div>
                 </div>
                 <div><h3 className="mb-1 text-sm font-semibold text-slate-700">Descripción</h3><p className="whitespace-pre-wrap text-sm text-slate-600">{selectedRequest.Descripcion}</p></div>
+                {selectedRequest.TipoCodigo === 'vacaciones' && (
+                  <div className="grid gap-3 rounded-xl bg-slate-50 p-4 text-sm sm:grid-cols-2">
+                    <div><span className="font-semibold">Cédula:</span> {selectedRequest.SolicitanteCedula || '—'}</div>
+                    <div><span className="font-semibold">Reintegro:</span> {formatDate(selectedRequest.FechaReintegro)}</div>
+                    <div><span className="font-semibold">Días en dinero:</span> {selectedRequest.DiasDinero ?? 0}</div>
+                    <div><span className="font-semibold">Días en disfrute:</span> {selectedRequest.DiasDisfrute ?? 0}</div>
+                    <div className="sm:col-span-2"><span className="font-semibold">Período pendiente:</span> {selectedRequest.PeriodoPendiente || 'Ninguno'}</div>
+                  </div>
+                )}
+                {selectedRequest.EstadoSolicitud === 'Aprobada' && selectedRequest.EstadoNomina && (
+                  <div className="space-y-3 rounded-xl border border-slate-200 p-4">
+                    <div className="text-sm font-semibold text-slate-800">
+                      Nómina: {(selectedRequest.RolNomina ? PAYROLL_STAFF_LABELS : PAYROLL_LABELS)[selectedRequest.EstadoNomina]}
+                    </div>
+                    {(selectedRequest.NominaDocumentos ?? []).map((doc) => (
+                      <button key={doc.Id} onClick={() => downloadPayrollDoc(doc)} className="mr-2 inline-flex items-center gap-2 rounded-lg border border-slate-200 px-3 py-2 text-sm text-blue-700 hover:bg-blue-50">
+                        <Download size={15} /> {doc.NombreArchivo}
+                      </button>
+                    ))}
+                    {selectedRequest.RolNomina === 'aux' && ['Pendiente_Liquidacion', 'Con_Errores'].includes(selectedRequest.EstadoNomina) && (
+                      <div className="space-y-3">
+                        {selectedRequest.EstadoNomina === 'Con_Errores' && (
+                          <p className="rounded-lg bg-red-50 p-3 text-sm text-red-700">El formato contiene errores. Revisa el comentario del analista en el historial y sube la liquidación corregida.</p>
+                        )}
+                        <input
+                          type="file"
+                          accept=".pdf,.png,.jpg,.jpeg,.xlsx,.xls"
+                          onChange={(event) => setPayrollFile(event.target.files?.[0] ?? null)}
+                          className="block w-full text-sm"
+                        />
+                        <button
+                          disabled={saving || !payrollFile}
+                          onClick={() => runPayrollAction(() => solicitudesAPI.uploadPayrollDocument(selectedRequest.Id, payrollFile), 'No se pudo subir la liquidación.')}
+                          className="inline-flex items-center gap-2 rounded-xl bg-orange-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-orange-700 disabled:opacity-50"
+                        >
+                          <Upload size={16} /> {selectedRequest.EstadoNomina === 'Con_Errores' ? 'Subir liquidación corregida' : 'Subir liquidación'}
+                        </button>
+                      </div>
+                    )}
+                    {selectedRequest.RolNomina === 'analista' && selectedRequest.EstadoNomina === 'Pendiente_Revision_Nomina' && (
+                      <div className="space-y-3">
+                        <textarea
+                          rows={2}
+                          value={payrollComment}
+                          onChange={(event) => setPayrollComment(event.target.value)}
+                          placeholder="Comentario (obligatorio si no aprueba)"
+                          className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm"
+                        />
+                        <div className="flex flex-wrap gap-3">
+                          <button
+                            disabled={saving || !payrollComment.trim()}
+                            onClick={() => runPayrollAction(() => solicitudesAPI.reviewPayroll(selectedRequest.Id, 'NO', payrollComment.trim()), 'No se pudo registrar la revisión.')}
+                            className="inline-flex items-center gap-2 rounded-xl border border-red-200 px-4 py-2.5 text-sm font-semibold text-red-700 hover:bg-red-50 disabled:opacity-50"
+                          >
+                            <XCircle size={16} /> No aprobado
+                          </button>
+                          <button
+                            disabled={saving}
+                            onClick={() => runPayrollAction(() => solicitudesAPI.reviewPayroll(selectedRequest.Id, 'OK', payrollComment.trim()), 'No se pudo registrar la revisión.')}
+                            className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-50"
+                          >
+                            <CheckCircle2 size={16} /> OK
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                    {selectedRequest.RolNomina === 'analista' && selectedRequest.EstadoNomina === 'Pendiente_Pago' && (
+                      <button
+                        disabled={saving}
+                        onClick={() => runPayrollAction(() => solicitudesAPI.markPayrollPaid(selectedRequest.Id), 'No se pudo registrar el pago.')}
+                        className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-50"
+                      >
+                        <Banknote size={16} /> Pagado
+                      </button>
+                    )}
+                  </div>
+                )}
                 {selectedRequest.EstadoSolicitud === 'Aprobada' && (
                   <button
                     type="button"
@@ -434,7 +660,7 @@ const SolicitudesPage = () => {
                       <li key={item.Id} className="relative">
                         <span className="absolute -left-[22px] top-1 h-2.5 w-2.5 rounded-full bg-orange-500" />
                         <div className="text-sm font-semibold text-slate-800">{item.Accion} · {item.Nombres} {item.Apellidos}</div>
-                        <div className="text-xs text-slate-500">Etapa {item.Nivel} · {new Date(item.Fecha).toLocaleString()}</div>
+                        <div className="text-xs text-slate-500">Etapa {item.Nivel === 4 || item.Nivel === '4' ? 'Nómina' : item.Nivel} · {new Date(item.Fecha).toLocaleString()}</div>
                         {item.Comentario && <p className="mt-1 whitespace-pre-wrap text-sm text-slate-600">{item.Comentario}</p>}
                       </li>
                     ))}

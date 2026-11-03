@@ -99,6 +99,10 @@ Router::get('/api/v1/solicitudes/laborales/tipos', function () {
     (new SolicitudLaboralController())->types();
 }, ['jwt']);
 
+Router::get('/api/v1/solicitudes/laborales/empresas', function () {
+    (new SolicitudLaboralController())->companies();
+}, ['jwt']);
+
 Router::get('/api/v1/solicitudes/laborales/mis-solicitudes', function () {
     (new SolicitudLaboralController())->mine();
 }, ['jwt']);

@@ -61,7 +61,11 @@ try {
         '030_roles_definitivos.sql',
         '031_eliminar_areas_y_copiar_organigrama.sql',
         '032_limpieza_tablas_sin_uso.sql',
-        '033_cedula_nomina_notificaciones.sql'
+        '033_cedula_nomina_notificaciones.sql',
+        '034_solicitudes_dotacion.sql',
+        '035_talla_dotacion.sql',
+        '036_entregas_dotacion_registro.sql',
+        '037_correccion_ortografica_catalogos.sql'
     ];
     
     foreach ($migrations as $migrationFile) {

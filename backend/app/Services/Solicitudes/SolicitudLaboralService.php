@@ -22,6 +22,11 @@ class SolicitudLaboralService
         return $this->repository->getTypes();
     }
 
+    public function getUserCompanies(int $userId): array
+    {
+        return $this->repository->getUserCompanies($userId);
+    }
+
     public function getMine(int $userId): array
     {
         return $this->repository->getMine($userId);
@@ -201,7 +206,21 @@ class SolicitudLaboralService
         }
 
         $vacation = ['FechaReintegro' => null, 'DiasDinero' => null, 'DiasDisfrute' => null, 'PeriodoPendiente' => null];
+        $companyId = null;
         if (($type['Codigo'] ?? '') === 'vacaciones') {
+            $rawCompanyId = filter_var($data['EmpresaId'] ?? null, FILTER_VALIDATE_INT);
+            $availableCompanies = $this->repository->getUserCompanies($userId);
+            if ($rawCompanyId !== false) {
+                foreach ($availableCompanies as $company) {
+                    if ((int) $company['Id'] === $rawCompanyId) {
+                        $companyId = $rawCompanyId;
+                        break;
+                    }
+                }
+            }
+            if ($companyId === null) {
+                $errors['EmpresaId'] = ['Selecciona una empresa asignada a tu usuario para la solicitud.'];
+            }
             $returnDate = $this->normalizeDate($data['FechaReintegro'] ?? null);
             $moneyDays = filter_var($data['DiasDinero'] ?? null, FILTER_VALIDATE_INT, ['options' => ['min_range' => 0, 'max_range' => 365]]);
             $enjoyDays = filter_var($data['DiasDisfrute'] ?? null, FILTER_VALIDATE_INT, ['options' => ['min_range' => 0, 'max_range' => 365]]);
@@ -246,6 +265,7 @@ class SolicitudLaboralService
             'Descripcion' => $description,
             'FechaInicio' => $startDate,
             'FechaFin' => $endDate,
+            'EmpresaSolicitudId' => $companyId,
             'Adjunto' => $attachment,
         ] + $vacation);
 

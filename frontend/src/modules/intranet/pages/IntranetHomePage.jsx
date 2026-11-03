@@ -149,6 +149,12 @@ export const IntranetHomePage = () => {
   }, [user]);
 
   useEffect(() => {
+    if (!selectedQualityCompany || selectedQualityArea) return;
+    const firstArea = qualityAreas.find((area) => canViewQualityArea(user, area.id));
+    if (firstArea) setSelectedQualityArea(firstArea.id);
+  }, [selectedQualityCompany, selectedQualityArea, user]);
+
+  useEffect(() => {
     if (activeTab !== 'calidad' || !selectedQualityCompany) {
       setQualityDocuments([]);
       setQualityDocumentsError('');

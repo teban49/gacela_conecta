@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Repositories\Gestion\ActivoRepository;
+use App\Repositories\DotacionRepository;
 use App\Repositories\NotificacionRepository;
 use App\Repositories\Solicitudes\SolicitudLaboralRepository;
 
@@ -79,6 +80,19 @@ class NotificacionService
                 'Leida' => 0,
                 'Persistente' => false,
                 'Fecha' => $ticket['FechaActualizacion'],
+            ];
+        }
+
+        foreach ((new DotacionRepository())->getPending($userId) as $request) {
+            $items[] = [
+                'Clave' => 'dotacion-' . $request['Id'],
+                'Tipo' => 'pendiente',
+                'Titulo' => 'Solicitud de dotación por aprobar',
+                'Mensaje' => trim("{$request['SolicitanteNombres']} {$request['SolicitanteApellidos']}") . ' · ' . $request['EmpresaNombre'],
+                'Enlace' => '/dotacion?id=' . $request['Id'],
+                'Leida' => 0,
+                'Persistente' => false,
+                'Fecha' => $request['FechaActualizacion'] ?? $request['FechaCreacion'],
             ];
         }
 

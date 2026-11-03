@@ -21,6 +21,12 @@ class SolicitudLaboralController
         Response::success($this->service->getTypes(), 'Tipos de solicitud obtenidos correctamente.');
     }
 
+    public function companies(): void
+    {
+        $user = $this->authenticatedUser();
+        Response::success($this->service->getUserCompanies((int) $user['id']), 'Empresas del usuario obtenidas correctamente.');
+    }
+
     public function mine(): void
     {
         $user = $this->authenticatedUser();

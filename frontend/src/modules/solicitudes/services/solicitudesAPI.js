@@ -32,4 +32,19 @@ export const solicitudesAPI = {
     api.post(`/solicitudes/laborales/${id}/decision`, { Decision, Comentario }),
   downloadLaboralAttachment: (id, attachmentId) =>
     api.get(`/solicitudes/laborales/${id}/adjuntos/${attachmentId}`, { responseType: 'blob' }),
+
+  // Liquidación de nómina tras la aprobación final
+  getPayrollRequests: () => api.get('/solicitudes/laborales/nomina'),
+  uploadPayrollDocument: (id, file) => {
+    const body = new FormData();
+    body.append('Documento', file);
+    return api.post(`/solicitudes/laborales/${id}/nomina`, body, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+  },
+  reviewPayroll: (id, Decision, Comentario) =>
+    api.post(`/solicitudes/laborales/${id}/nomina/revision`, { Decision, Comentario }),
+  markPayrollPaid: (id) => api.post(`/solicitudes/laborales/${id}/nomina/pagar`),
+  downloadPayrollDocument: (id, documentId) =>
+    api.get(`/solicitudes/laborales/${id}/nomina/${documentId}`, { responseType: 'blob' }),
 };
