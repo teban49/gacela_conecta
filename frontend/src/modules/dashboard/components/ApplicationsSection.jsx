@@ -4,6 +4,7 @@ import {
   Ticket,
   Boxes,
   Shield,
+  Laptop,
   Package
 } from "lucide-react";
 import ApplicationCard from "./ApplicationCard";
@@ -39,9 +40,17 @@ const ApplicationsSection = () => {
       permission: "solicitudes.ver"
     },
     {
+      title: "Dotación",
+      description: "Solicitud, aprobación y entrega de dotación.",
+      icon: Package,
+      color: "#8b5cf6",
+      to: "/dotacion",
+      permission: "solicitudes.ver"
+    },
+    {
       title: "Gestión Tecnológica",
       description: "Consulta y crea tickets de incidencias tecnológicas.",
-      icon: Package,
+      icon: Laptop,
       color: "#10b981",
       to: usesExternalGestion(user) ? GESTION_EXTERNAL_URL : "/gestion",
       external: usesExternalGestion(user),

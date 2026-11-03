@@ -1,3 +1,4 @@
+import { companyLogoFile, companyLogoSrc } from '../../../utils/companyLogos';
 const escapeHtml = (value) => String(value ?? '')
   .replace(/&/g, '&amp;')
   .replace(/</g, '&lt;')
@@ -17,18 +18,9 @@ const STAGES = { 1: 'Jefe directo', 2: 'Recursos Humanos', 3: 'Gerencia', 4: 'N�
 // Imágenes en frontend/public/media/solicitudes/; si no existen, se ocultan.
 const IMAGE_BASE = '/media/solicitudes';
 const STAGE_SIGNATURE_FILES = { 1: 'firma-jefe.png', 2: 'firma-rrhh.png', 3: 'firma-gerencia.png' };
-const optionalImage = (file, className) => {
-  const origin = typeof window !== 'undefined' ? window.location.origin : '';
-  return `<img class="${className}" src="${origin}${IMAGE_BASE}/${file}" alt="" onerror="this.style.display='none'" />`;
-};
-
-const companyLogoFile = (companyName) => {
-  const name = String(companyName ?? '').toLowerCase();
-  if (name.includes('flota')) return 'logo_flota.jpeg';
-  if (name.includes('rapido') || name.includes('rápido')) return 'logo_rapido.jpeg';
-  if (name.includes('expreso') || name.includes('paz')) return 'logo_expreso.jpeg';
-  return null;
-};
+const optionalImage = (file, className) => (
+  `<img class="${className}" src="${companyLogoSrc(file)}" alt="" onerror="this.style.display='none'" />`
+);
 
 export const buildSolicitudDocumentHtml = (request) => {
   const code = String(request.TipoCodigo ?? '').toLowerCase();
@@ -198,7 +190,7 @@ const buildVacationFormHtml = (request) => {
       ${signatureBlock('Firma Trabajador', ctx.solicitante, null, ctx, request)}
       ${isDriver ? signatureBlock('Vo.Bo. Propietario y/o Administrador', '', null, ctx, request) : ''}
       ${signatureBlock('Vo. Bo. Jefe inmediato', '', 1, ctx, request)}
-      ${signatureBlock('Vo.Bo. Gerente', '', 3, ctx, request)}
+      ${signatureBlock('Vo.Bo. Gerente', request.GerenteNombre ?? '', 3, ctx, request)}
     </div>
     <div class="record">${escapeHtml(ctx.approvalRecord)}</div>`;
   return wrapForm(request, body, ctx);

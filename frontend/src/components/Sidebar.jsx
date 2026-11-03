@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Home, ShieldCheck, BookOpen, Phone, FileText, Headphones, Shield, ClipboardList, Package, LayoutDashboard } from 'lucide-react';
+import { Home, ShieldCheck, BookOpen, Phone, FileText, Headphones, Shield, ClipboardList, Package, LayoutDashboard, Laptop } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { applicationsAPI } from '../services/applicationsAPI';
 import { GESTION_EXTERNAL_URL, usesExternalGestion } from '../utils/gestionAccess';
@@ -66,10 +66,16 @@ export const Sidebar = () => {
     { title: 'Home Principal', href: '/dashboard', icon: Home },
     { title: 'Intranet', href: '/intranet', icon: BookOpen, permission: 'intranet.ver' },
     { title: 'Solicitudes', href: '/solicitudes', icon: ClipboardList, permission: 'solicitudes.ver' },
-    { title: 'Gestión Tecnológica', href: '/gestion', icon: Package, permission: ['gestion.ver', 'gestion.incidencias.ver'] },
+    { title: 'Gestión Tecnológica', href: '/gestion', icon: Laptop, permission: ['gestion.ver', 'gestion.incidencias.ver'] },
   ];
 
-  const finalMenuItems = (menuItems.length > 0 ? menuItems : fallbackMenuItems).map((item) => (
+  const configuredMenuItems = menuItems.length > 0 ? menuItems : fallbackMenuItems;
+  const finalMenuItems = [
+    ...configuredMenuItems,
+    ...(!configuredMenuItems.some((item) => item.href === '/dotacion')
+      ? [{ title: 'Dotación', href: '/dotacion', icon: Package, permission: 'solicitudes.ver' }]
+      : []),
+  ].map((item) => (
     item.href === '/gestion' && usesExternalGestion(user)
       ? { ...item, href: GESTION_EXTERNAL_URL, external: true }
       : item
@@ -96,6 +102,7 @@ export const Sidebar = () => {
       'shield': Shield,
       'shield-check': ShieldCheck,
       'package': Package,
+      'laptop': Laptop,
     };
     return iconMap[icono] || LayoutDashboard;
   }

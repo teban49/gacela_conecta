@@ -418,15 +418,6 @@ export const IntranetHomePage = () => {
             <p className="text-slate-500 mt-1">Centro de comunicación, gestión documental de Calidad y Organigrama.</p>
           </div>
           <div className="flex gap-2">
-            {canManageDocuments && (
-            <button 
-              onClick={() => setShowDocModal(true)}
-              className="inline-flex items-center gap-2 px-4 py-2.5 bg-orange-600 text-white rounded-xl text-sm font-semibold hover:bg-orange-700 transition"
-            >
-              <Upload size={16} />
-              Cargar Documento
-            </button>
-            )}
             {canManageNews && (
             <button 
               onClick={() => setShowNoticiaModal(true)}

@@ -72,6 +72,7 @@ const SolicitudesPage = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const [payrollRole, setPayrollRole] = useState(null);
   const [payrollRequests, setPayrollRequests] = useState([]);
+  const [companies, setCompanies] = useState([]);
   const [payrollFile, setPayrollFile] = useState(null);
   const [payrollComment, setPayrollComment] = useState('');
   const emptyForm = {
@@ -81,6 +82,7 @@ const SolicitudesPage = () => {
     FechaInicio: '',
     FechaFin: '',
     FechaReintegro: '',
+    EmpresaId: '',
     DiasDinero: '0',
     DiasDisfrute: '0',
     PeriodoPendiente: '',
@@ -96,13 +98,16 @@ const SolicitudesPage = () => {
     setLoading(true);
     setPageError('');
     try {
-      const [typesResponse, mineResponse, pendingResponse] = await Promise.all([
+      const [typesResponse, mineResponse, pendingResponse, companiesResponse] = await Promise.all([
         solicitudesAPI.getLaboralTypes(),
         solicitudesAPI.getMyLaboralRequests(),
         solicitudesAPI.getPendingLaboralRequests(),
+        solicitudesAPI.getLaboralCompanies(),
       ]);
       const loadedTypes = typesResponse.data?.data ?? [];
+      const loadedCompanies = companiesResponse.data?.data ?? [];
       setTypes(loadedTypes);
+      setCompanies(loadedCompanies);
       setMyRequests(mineResponse.data?.data ?? []);
       setPendingRequests(pendingResponse.data?.data ?? []);
       try {
@@ -116,6 +121,7 @@ const SolicitudesPage = () => {
       setFormData((current) => ({
         ...current,
         TipoId: current.TipoId || (loadedTypes[0] ? String(loadedTypes[0].Id) : ''),
+        EmpresaId: current.EmpresaId || (loadedCompanies[0] ? String(loadedCompanies[0].Id) : ''),
       }));
     } catch (error) {
       console.error('Error cargando solicitudes laborales:', error);
@@ -183,6 +189,7 @@ const SolicitudesPage = () => {
     body.append('FechaFin', formData.FechaFin);
     if (formData.Adjunto) body.append('Adjunto', formData.Adjunto);
     if (activeType?.Codigo === 'vacaciones') {
+      body.append('EmpresaId', formData.EmpresaId);
       body.append('FechaReintegro', formData.FechaReintegro);
       body.append('DiasDinero', formData.DiasDinero || '0');
       body.append('DiasDisfrute', formData.DiasDisfrute || '0');
@@ -383,6 +390,17 @@ const SolicitudesPage = () => {
         )}
         {activeType?.Codigo === 'vacaciones' && (
           <>
+            <label className="text-sm font-semibold text-slate-700">
+              Empresa <span className="text-red-600">*</span>
+              <select
+                required
+                value={formData.EmpresaId}
+                onChange={(event) => setFormData({ ...formData, EmpresaId: event.target.value })}
+                className="mt-2 w-full rounded-xl border border-slate-200 bg-white px-4 py-3"
+              >
+                {companies.map((company) => <option key={company.Id} value={company.Id}>{company.Nombre}</option>)}
+              </select>
+            </label>
             <label className="text-sm font-semibold text-slate-700">
               Cédula de ciudadanía
               <input
