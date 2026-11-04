@@ -46,7 +46,47 @@ class IntranetService
         return $this->intranetRepo->getDirectorio();
     }
 
+    public function createDirectorio(array $data): array
+    {
+        $validated = $this->validateDirectorio($data);
+        if ($validated['errors']) {
+            return ['success' => false, 'errors' => $validated['errors'], 'message' => 'Revisa los datos del contacto.'];
+        }
+
+        $id = $this->intranetRepo->createDirectorio($validated['values']);
+        return ['success' => true, 'message' => 'Contacto agregado correctamente.', 'data' => ['id' => $id]];
+    }
+
+    public function deleteDirectorio(int $id): array
+    {
+        if (!$this->intranetRepo->directorioExists($id)) {
+            return ['success' => false, 'message' => 'El contacto no existe.'];
+        }
+        if (!$this->intranetRepo->deleteDirectorio($id)) {
+            return ['success' => false, 'message' => 'No fue posible eliminar el contacto.'];
+        }
+
+        return ['success' => true, 'message' => 'Contacto eliminado correctamente.'];
+    }
+
     public function updateDirectorio(int $id, array $data): array
+    {
+        $validated = $this->validateDirectorio($data);
+        if ($validated['errors']) {
+            return ['success' => false, 'errors' => $validated['errors'], 'message' => 'Revisa los datos del contacto.'];
+        }
+
+        if (!$this->intranetRepo->directorioExists($id)) {
+            return ['success' => false, 'message' => 'El contacto no existe.'];
+        }
+        if (!$this->intranetRepo->updateDirectorio($id, $validated['values'])) {
+            return ['success' => false, 'message' => 'No fue posible actualizar el contacto.'];
+        }
+
+        return ['success' => true, 'message' => 'Contacto actualizado correctamente.'];
+    }
+
+    private function validateDirectorio(array $data): array
     {
         $limits = [
             'first_name' => 100,
@@ -80,18 +120,8 @@ class IntranetService
         if (($values['email'] ?? null) !== null && !filter_var($values['email'], FILTER_VALIDATE_EMAIL)) {
             $errors['email'] = ['Ingresa un correo electrónico válido.'];
         }
-        if ($errors) {
-            return ['success' => false, 'errors' => $errors, 'message' => 'Revisa los datos del contacto.'];
-        }
 
-        if (!$this->intranetRepo->directorioExists($id)) {
-            return ['success' => false, 'message' => 'El contacto no existe.'];
-        }
-        if (!$this->intranetRepo->updateDirectorio($id, $values)) {
-            return ['success' => false, 'message' => 'No fue posible actualizar el contacto.'];
-        }
-
-        return ['success' => true, 'message' => 'Contacto actualizado correctamente.'];
+        return ['values' => $values, 'errors' => $errors];
     }
 
     public function getDocumentos(?int $empresaId = null, ?int $areaId = null, ?int $categoriaId = null, ?string $search = null): array

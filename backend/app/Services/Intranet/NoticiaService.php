@@ -116,6 +116,22 @@ class NoticiaService
         ];
     }
 
+    public function delete(int $id): array
+    {
+        $noticia = $this->repository->getById($id);
+        if (!$noticia) {
+            return ['success' => false, 'message' => 'La noticia no existe.'];
+        }
+
+        $this->repository->remove($id);
+        $imagePath = $this->getImagePath((string) ($noticia['Imagen'] ?? ''));
+        if ($imagePath !== null) {
+            @unlink($imagePath);
+        }
+
+        return ['success' => true, 'message' => 'Noticia eliminada correctamente.'];
+    }
+
     public function changeStatus(int $id, string $status): array
     {
         $noticia = $this->repository->getById($id);

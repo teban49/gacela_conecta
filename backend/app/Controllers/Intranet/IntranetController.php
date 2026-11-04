@@ -41,6 +41,26 @@ class IntranetController
         Response::error($result['message'], [], 404);
     }
 
+    public function createDirectorio(): void
+    {
+        $result = $this->service->createDirectorio(Request::json());
+        if ($result['success']) {
+            Response::created($result['data'] ?? null, $result['message']);
+            return;
+        }
+        Response::validationError($result['errors'] ?? [], $result['message']);
+    }
+
+    public function deleteDirectorio(int $id): void
+    {
+        $result = $this->service->deleteDirectorio($id);
+        if ($result['success']) {
+            Response::success(null, $result['message']);
+            return;
+        }
+        Response::error($result['message'], [], 404);
+    }
+
     public function documentos(): void
     {
         $request = new Request();

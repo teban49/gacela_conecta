@@ -48,6 +48,35 @@ class IntranetRepository extends BaseRepository
         ]);
     }
 
+    public function createDirectorio(array $data): int
+    {
+        $stmt = $this->db->prepare("
+            INSERT INTO directorio_gacela_conecta
+                (first_name, last_name, address, phone, email, extension, area_agencia, cargo, empresa)
+            VALUES
+                (:first_name, :last_name, :address, :phone, :email, :extension, :area_agencia, :cargo, :empresa)
+        ");
+        $stmt->execute([
+            ':first_name' => $data['first_name'],
+            ':last_name' => $data['last_name'],
+            ':address' => $data['address'],
+            ':phone' => $data['phone'],
+            ':email' => $data['email'],
+            ':extension' => $data['extension'],
+            ':area_agencia' => $data['area_agencia'],
+            ':cargo' => $data['cargo'],
+            ':empresa' => $data['empresa'],
+        ]);
+
+        return (int) $this->db->lastInsertId();
+    }
+
+    public function deleteDirectorio(int $id): bool
+    {
+        $stmt = $this->db->prepare('DELETE FROM directorio_gacela_conecta WHERE id = :id');
+        return $stmt->execute([':id' => $id]);
+    }
+
     public function directorioExists(int $id): bool
     {
         $stmt = $this->db->prepare('SELECT 1 FROM directorio_gacela_conecta WHERE id = :id');

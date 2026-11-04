@@ -131,6 +131,16 @@ class NoticiaController
         }
     }
 
+    public function destroy(int $id): void
+    {
+        $result = $this->service->delete($id);
+        if ($result['success']) {
+            Response::success(null, $result['message']);
+            return;
+        }
+        Response::error($result['message'], [], 404);
+    }
+
     public function changeStatus(int $id): void
     {
         $data = Request::json();

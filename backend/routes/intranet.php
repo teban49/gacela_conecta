@@ -5,7 +5,38 @@ use App\Controllers\Intranet\DocumentoController;
 use App\Controllers\Intranet\EventoController;
 use App\Controllers\Intranet\IntranetController;
 use App\Controllers\Intranet\OrganigramaPuestoController;
+use App\Controllers\Intranet\ManualController;
 use App\Core\Router;
+
+Router::post('/api/v1/intranet/directorio', function () {
+    $controller = new IntranetController();
+    $controller->createDirectorio();
+}, ['jwt', 'intranet.administrar_directorio']);
+
+Router::delete('/api/v1/intranet/directorio/{id}', function (int $id) {
+    $controller = new IntranetController();
+    $controller->deleteDirectorio($id);
+}, ['jwt', 'intranet.administrar_directorio']);
+
+Router::delete('/api/v1/intranet/noticias/{id}', function (int $id) {
+    $controller = new NoticiaController();
+    $controller->destroy($id);
+}, ['jwt', 'intranet.administrar_noticias']);
+
+Router::post('/api/v1/intranet/manuales', function () {
+    $controller = new ManualController();
+    $controller->store();
+}, ['jwt', 'intranet.administrar_documentos']);
+
+Router::post('/api/v1/intranet/manuales/{id}', function (string $id) {
+    $controller = new ManualController();
+    $controller->update($id);
+}, ['jwt', 'intranet.administrar_documentos']);
+
+Router::delete('/api/v1/intranet/manuales/{id}', function (string $id) {
+    $controller = new ManualController();
+    $controller->destroy($id);
+}, ['jwt', 'intranet.administrar_documentos']);
 
 Router::get('/api/v1/intranet/home', function () {
     $controller = new IntranetController();

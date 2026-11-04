@@ -135,6 +135,20 @@ class NoticiaRepository extends BaseRepository
         ]);
     }
 
+    public function remove(int $id): bool
+    {
+        $this->db->beginTransaction();
+        try {
+            $this->db->prepare('DELETE FROM intranet_noticias_vistas WHERE NoticiaId = :Id')->execute([':Id' => $id]);
+            $this->db->prepare("DELETE FROM {$this->table} WHERE Id = :Id")->execute([':Id' => $id]);
+            $this->db->commit();
+            return true;
+        } catch (\Throwable $e) {
+            $this->db->rollBack();
+            throw $e;
+        }
+    }
+
     public function changeStatus(int $id, bool|string $status): bool
     {
         $sql = "
