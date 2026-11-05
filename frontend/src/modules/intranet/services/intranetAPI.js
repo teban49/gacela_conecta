@@ -2,6 +2,7 @@ import api from '../../../services/api';
 
 export const intranetAPI = {
   getDirectorio: () => api.get('/intranet/directorio'),
+  getCumpleanos: () => api.get('/intranet/cumpleanos'),
   updateDirectorio: (id, data) => api.put(`/intranet/directorio/${id}`, data),
   createDirectorio: (data) => api.post('/intranet/directorio', data),
   deleteDirectorio: (id) => api.delete(`/intranet/directorio/${id}`),

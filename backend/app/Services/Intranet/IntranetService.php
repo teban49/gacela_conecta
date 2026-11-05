@@ -121,6 +121,19 @@ class IntranetService
             $errors['email'] = ['Ingresa un correo electrónico válido.'];
         }
 
+        $birth = $data['fecha_nacimiento'] ?? null;
+        $birth = is_string($birth) ? trim($birth) : '';
+        if ($birth === '') {
+            $values['fecha_nacimiento'] = null;
+        } else {
+            $parsed = \DateTime::createFromFormat('!Y-m-d', $birth);
+            if (!$parsed || $parsed->format('Y-m-d') !== $birth || $birth > date('Y-m-d') || $birth < '1900-01-01') {
+                $errors['fecha_nacimiento'] = ['Ingresa una fecha de nacimiento válida.'];
+            } else {
+                $values['fecha_nacimiento'] = $birth;
+            }
+        }
+
         return ['values' => $values, 'errors' => $errors];
     }
 

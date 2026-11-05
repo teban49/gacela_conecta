@@ -53,6 +53,7 @@ const DirectoryPage = ({ embedded = false }) => {
     setSaveMessage('');
     try {
       const payload = Object.fromEntries(columns.map(([key]) => [key, editingEntry[key] ?? '']));
+      payload.fecha_nacimiento = editingEntry.fecha_nacimiento || null;
       const isNew = !editingEntry.id;
       if (isNew) await intranetAPI.createDirectorio(payload);
       else await intranetAPI.updateDirectorio(editingEntry.id, payload);
@@ -231,6 +232,17 @@ const DirectoryPage = ({ embedded = false }) => {
                   />
                 </label>
               ))}
+              <label className="text-sm font-semibold text-slate-700">
+                Fecha de nacimiento
+                <input
+                  type="date"
+                  min="1900-01-01"
+                  max={new Date().toISOString().slice(0, 10)}
+                  value={editingEntry.fecha_nacimiento ?? ''}
+                  onChange={(event) => setEditingEntry({ ...editingEntry, fecha_nacimiento: event.target.value })}
+                  className="mt-2 w-full rounded-xl border border-slate-200 px-4 py-3 font-normal"
+                />
+              </label>
             </div>
             <div className="flex justify-end gap-3">
               <button type="button" disabled={saving} onClick={() => setEditingEntry(null)} className="rounded-xl border border-slate-200 px-4 py-2.5 font-semibold text-slate-700 hover:bg-slate-50">Cancelar</button>

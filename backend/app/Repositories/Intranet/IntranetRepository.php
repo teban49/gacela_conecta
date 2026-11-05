@@ -10,7 +10,7 @@ class IntranetRepository extends BaseRepository
     public function getDirectorio(): array
     {
         $stmt = $this->db->query("
-            SELECT id, first_name, last_name, address, phone, email, extension, area_agencia, cargo, empresa
+            SELECT id, first_name, last_name, address, phone, email, extension, area_agencia, cargo, empresa, fecha_nacimiento
             FROM directorio_gacela_conecta
             ORDER BY first_name ASC, last_name ASC, id ASC
         ");
@@ -30,7 +30,8 @@ class IntranetRepository extends BaseRepository
                 extension = :extension,
                 area_agencia = :area_agencia,
                 cargo = :cargo,
-                empresa = :empresa
+                empresa = :empresa,
+                fecha_nacimiento = :fecha_nacimiento
             WHERE id = :id
         ");
 
@@ -45,6 +46,7 @@ class IntranetRepository extends BaseRepository
             ':area_agencia' => $data['area_agencia'],
             ':cargo' => $data['cargo'],
             ':empresa' => $data['empresa'],
+            ':fecha_nacimiento' => $data['fecha_nacimiento'] ?? null,
         ]);
     }
 
@@ -52,9 +54,9 @@ class IntranetRepository extends BaseRepository
     {
         $stmt = $this->db->prepare("
             INSERT INTO directorio_gacela_conecta
-                (first_name, last_name, address, phone, email, extension, area_agencia, cargo, empresa)
+                (first_name, last_name, address, phone, email, extension, area_agencia, cargo, empresa, fecha_nacimiento)
             VALUES
-                (:first_name, :last_name, :address, :phone, :email, :extension, :area_agencia, :cargo, :empresa)
+                (:first_name, :last_name, :address, :phone, :email, :extension, :area_agencia, :cargo, :empresa, :fecha_nacimiento)
         ");
         $stmt->execute([
             ':first_name' => $data['first_name'],
@@ -66,6 +68,7 @@ class IntranetRepository extends BaseRepository
             ':area_agencia' => $data['area_agencia'],
             ':cargo' => $data['cargo'],
             ':empresa' => $data['empresa'],
+            ':fecha_nacimiento' => $data['fecha_nacimiento'] ?? null,
         ]);
 
         return (int) $this->db->lastInsertId();

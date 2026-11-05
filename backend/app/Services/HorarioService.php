@@ -37,6 +37,68 @@ class HorarioService
         return stripos($cargo, 'jefe') !== false;
     }
 
+    /**
+     * Inserta marcaciones nuevas; las que ya existen (misma persona y fecha-hora) se omiten.
+     *
+     * @return array{recibidos:int,nuevos:int,duplicados:int,invalidos:int,desde:?string,hasta:?string}
+     */
+    public function import(array $records): array
+    {
+        $valid = [];
+        $invalid = 0;
+        foreach ($records as $record) {
+            $pid = preg_replace('/\D/', '', (string) ($record['person_id'] ?? ''));
+            $name = trim((string) ($record['nombre'] ?? ''));
+            $dt = \DateTime::createFromFormat('!Y-m-d H:i:s', (string) ($record['fecha_hora'] ?? ''));
+            if ($pid === '' || strlen($pid) > 8 || $name === '' || strlen($name) > 255 || !$dt || $dt->format('Y-m-d H:i:s') !== $record['fecha_hora']) {
+                $invalid++;
+                continue;
+            }
+            $valid[str_pad($pid, 8, '0', STR_PAD_LEFT) . '|' . $record['fecha_hora']] = [str_pad($pid, 8, '0', STR_PAD_LEFT), $name, $record['fecha_hora']];
+        }
+
+        $inserted = 0;
+        $from = $to = null;
+        if ($valid) {
+            $dates = array_column($valid, 2);
+            sort($dates);
+            $from = substr($dates[0], 0, 10);
+            $to = substr(end($dates), 0, 10);
+
+            $existing = [];
+            $stmt = $this->db->prepare('SELECT person_id, fecha_hora FROM control_asistencia WHERE fecha_hora >= :from AND fecha_hora < DATE_ADD(:to, INTERVAL 1 DAY)');
+            $stmt->execute([':from' => $from, ':to' => $to]);
+            foreach ($stmt->fetchAll(PDO::FETCH_NUM) as [$pid, $dt]) {
+                $existing[$pid . '|' . $dt] = true;
+            }
+
+            $insert = $this->db->prepare('INSERT INTO control_asistencia (person_id, nombre, fecha_hora) VALUES (?, ?, ?)');
+            $this->db->beginTransaction();
+            try {
+                foreach ($valid as $key => $row) {
+                    if (isset($existing[$key])) {
+                        continue;
+                    }
+                    $insert->execute($row);
+                    $inserted++;
+                }
+                $this->db->commit();
+            } catch (\Throwable $e) {
+                $this->db->rollBack();
+                throw $e;
+            }
+        }
+
+        return [
+            'recibidos' => count($records),
+            'nuevos' => $inserted,
+            'duplicados' => count($valid) - $inserted,
+            'invalidos' => $invalid,
+            'desde' => $from,
+            'hasta' => $to,
+        ];
+    }
+
     public function report(?string $from, ?string $to): array
     {
         $range = $this->db->query('SELECT DATE(MIN(fecha_hora)) a, DATE(MAX(fecha_hora)) b FROM control_asistencia')->fetch(PDO::FETCH_ASSOC);

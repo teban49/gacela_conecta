@@ -24,7 +24,30 @@ class IntranetController
 
     public function directorio(): void
     {
-        Response::success($this->service->getDirectorio(), 'Directorio de contactos obtenido.');
+        $rows = $this->service->getDirectorio();
+        if (!RoleAccess::isAdmin(Auth::user())) {
+            $rows = array_map(static function (array $row): array {
+                unset($row['fecha_nacimiento']);
+                return $row;
+            }, $rows);
+        }
+        Response::success($rows, 'Directorio de contactos obtenido.');
+    }
+
+    /** Cumpleaños sin año de nacimiento: visible para todo el personal. */
+    public function cumpleanos(): void
+    {
+        $rows = array_filter($this->service->getDirectorio(), static fn (array $row) => !empty($row['fecha_nacimiento']));
+        $result = array_map(static fn (array $row) => [
+            'id' => (int) $row['id'],
+            'nombre' => trim($row['first_name'] . ' ' . $row['last_name']),
+            'area' => $row['area_agencia'],
+            'cargo' => $row['cargo'],
+            'empresa' => $row['empresa'],
+            'mes' => (int) substr($row['fecha_nacimiento'], 5, 2),
+            'dia' => (int) substr($row['fecha_nacimiento'], 8, 2),
+        ], $rows);
+        Response::success(array_values($result), 'Cumpleaños obtenidos.');
     }
 
     public function updateDirectorio(int $id): void

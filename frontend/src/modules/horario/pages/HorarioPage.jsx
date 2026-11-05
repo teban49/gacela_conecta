@@ -1,8 +1,9 @@
 import React, { useEffect, useState } from 'react';
-import { Clock } from 'lucide-react';
+import { Clock, Upload } from 'lucide-react';
 import { useAuth } from '../../../contexts/AuthContext';
 import { canViewHorario } from '../../../utils/roleAccess';
 import { horarioAPI } from '../services/horarioAPI';
+import ImportAttendanceModal from '../components/ImportAttendanceModal';
 import GeneralTab from './GeneralTab';
 import PersonTab from './PersonTab';
 import AbsencesTab from './AbsencesTab';
@@ -20,7 +21,9 @@ const shiftMonths = (date, months) => {
 };
 
 export const HorarioPage = () => {
-  const { user } = useAuth();
+  const { user, hasRole } = useAuth();
+  const isAdmin = hasRole('admin');
+  const [showImport, setShowImport] = useState(false);
   const allowed = canViewHorario(user);
   const [tab, setTab] = useState('general');
   const [report, setReport] = useState(null);
@@ -83,6 +86,11 @@ export const HorarioPage = () => {
             <input type="date" required value={range.hasta} min={report?.minDate} max={report?.maxDate} onChange={(e) => setRange({ ...range, hasta: e.target.value })} className="mt-1 block rounded-xl border border-slate-200 px-3 py-2 text-sm" />
           </label>
           <button type="submit" className="rounded-xl bg-sky-600 px-4 py-2 text-sm font-semibold text-white hover:bg-sky-700">Aplicar</button>
+          {isAdmin && (
+            <button type="button" onClick={() => setShowImport(true)} className="inline-flex items-center gap-2 rounded-xl border border-sky-600 px-4 py-2 text-sm font-semibold text-sky-700 hover:bg-sky-50">
+              <Upload size={16} /> Cargar asistencia
+            </button>
+          )}
         </form>
       </header>
 
@@ -119,6 +127,7 @@ export const HorarioPage = () => {
           {tab === 'ausencias' && <AbsencesTab absences={report.ausencias} areas={report.areas} />}
         </>
       )}
+      {showImport && <ImportAttendanceModal onClose={() => setShowImport(false)} onImported={() => load()} />}
     </main>
   );
 };

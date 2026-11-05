@@ -93,7 +93,7 @@ const PersonTab = ({ rows, areas }) => {
                     { concepto: 'Salida tarde', minutos: totals.salidaTarde + totals.festivo, fill: '#0ea5e9' },
                   ]}>
                     <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="concepto" />
+                    <XAxis dataKey="concepto" interval={0} tick={{ fontSize: 12 }} />
                     <YAxis />
                     <Tooltip formatter={(value) => `${value} min`} />
                     <Bar dataKey="minutos" name="Minutos" radius={[6, 6, 0, 0]} shape={(props) => <rect {...props} fill={props.payload.fill} rx={6} />} />

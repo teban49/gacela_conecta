@@ -48,6 +48,11 @@ Router::get('/api/v1/intranet/directorio', function () {
     $controller->directorio();
 }, ['jwt', 'intranet.ver']);
 
+Router::get('/api/v1/intranet/cumpleanos', function () {
+    $controller = new IntranetController();
+    $controller->cumpleanos();
+}, ['jwt', 'intranet.ver']);
+
 Router::get('/api/v1/intranet/calidad/documentos', function () {
     $controller = new IntranetController();
     $controller->calidadDocumentos();

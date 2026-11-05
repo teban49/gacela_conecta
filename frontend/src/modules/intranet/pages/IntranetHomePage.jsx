@@ -1,11 +1,12 @@
 import React, { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
-import { Newspaper, FileText, Network, BookOpen, Video, ExternalLink, Plus, Search, Filter, Upload, Download, History, X, Building2, Layers, Users, Trash2, HelpCircle } from 'lucide-react';
+import { Newspaper, FileText, Network, BookOpen, Video, ExternalLink, Plus, Search, Filter, Upload, Download, History, X, Building2, Layers, Users, Trash2, HelpCircle, Cake } from 'lucide-react';
 import NewsFeed from '../components/NewsFeed';
 import FaqSection from '../components/FaqSection';
 import OrganigramaSection from '../components/OrganigramaSection';
 import { intranetAPI } from '../../../services/intranetAPI';
 import DirectoryPage from './DirectoryPage';
+import BirthdaysSection from '../components/BirthdaysSection';
 import { useAuth } from '../../../contexts/AuthContext';
 import { canViewQualityArea } from '../../../utils/roleAccess';
 
@@ -39,6 +40,7 @@ const routeTabs = {
   calidad: 'calidad',
   documentacion: 'documentacion',
   directorio: 'directorio',
+  cumpleanos: 'cumpleanos',
   organigrama: 'organigrama',
   'preguntas-frecuentes': 'preguntas',
   faq: 'preguntas',
@@ -489,6 +491,7 @@ export const IntranetHomePage = () => {
             { id: 'noticias', label: 'Noticias & Comunicados', icon: Newspaper },
             { id: 'calidad', label: 'Gestión de Calidad', icon: FileText },
             { id: 'directorio', label: 'Directorio', icon: Users },
+            { id: 'cumpleanos', label: 'Cumpleaños', icon: Cake },
             { id: 'organigrama', label: 'Organigrama Corporativo', icon: Network },
             { id: 'manuales', label: 'Manuales Técnicos', icon: BookOpen },
             { id: 'pildoras', label: 'Píldoras Capacitación', icon: Video },
@@ -519,6 +522,7 @@ export const IntranetHomePage = () => {
       )}
 
       {activeTab === 'directorio' && <DirectoryPage embedded />}
+      {activeTab === 'cumpleanos' && <BirthdaysSection />}
 
       {/* Tab: Calidad & Documentacion */}
       {activeTab === 'calidad' && (

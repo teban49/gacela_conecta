@@ -58,7 +58,6 @@ export const WeekdayChart = ({ data }) => {
             <Tooltip formatter={(value, name) => [name === 'Llegadas tarde' ? value : `${value} min`, name]} />
             <Legend />
             <Bar dataKey="minutosTarde" name="Minutos tarde" fill={COLORS.contra} radius={[6, 6, 0, 0]} />
-            <Bar dataKey="llegadasTarde" name="Llegadas tarde" fill={COLORS.warn} radius={[6, 6, 0, 0]} />
           </BarChart>
         </ResponsiveContainer>
       </div>
