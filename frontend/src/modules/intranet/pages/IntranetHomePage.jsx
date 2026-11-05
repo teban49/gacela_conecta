@@ -81,6 +81,11 @@ export const IntranetHomePage = () => {
   const [loading, setLoading] = useState(true);
   const [mediaCatalog, setMediaCatalog] = useState({ pildoras: {}, manuales: [], links: [] });
   const [mediaError, setMediaError] = useState('');
+  const [manualReload, setManualReload] = useState(0);
+  const [manualModal, setManualModal] = useState(null);
+  const [manualFile, setManualFile] = useState(null);
+  const [manualSaving, setManualSaving] = useState(false);
+  const [manualError, setManualError] = useState('');
   const [homeData, setHomeData] = useState({
     empresas: [],
     areas: [],
@@ -188,7 +193,7 @@ export const IntranetHomePage = () => {
     if (!path) return;
     let cancelled = false;
     setMediaError('');
-    loadMediaCatalog(path)
+    loadMediaCatalog(`${path}?t=${manualReload}`)
       .then((catalog) => {
         if (cancelled) return;
         if (activeTab === 'pildoras') {
@@ -209,7 +214,7 @@ export const IntranetHomePage = () => {
         if (!cancelled) setMediaError(error.message || 'No fue posible cargar el contenido.');
       });
     return () => { cancelled = true; };
-  }, [activeTab]);
+  }, [activeTab, manualReload]);
 
   useEffect(() => {
     if (tab) setActiveTab(routeTabs[tab.toLowerCase()] ?? 'noticias');
@@ -383,6 +388,53 @@ export const IntranetHomePage = () => {
     }
   };
 
+  const openManualModal = (manual = null) => {
+    setManualError('');
+    setManualFile(null);
+    setManualModal(manual
+      ? { id: manual.jsonId, Titulo: manual.titulo, Categoria: manual.tipo, Version: manual.version ?? '' }
+      : { id: null, Titulo: '', Categoria: manualCategories[1], Version: '' });
+  };
+
+  const saveManual = async (event) => {
+    event.preventDefault();
+    if (!manualModal.id && !manualFile) {
+      setManualError('Selecciona el archivo PDF del manual.');
+      return;
+    }
+    setManualSaving(true);
+    setManualError('');
+    try {
+      await intranetAPI.saveManual(manualModal.id, { ...manualModal, Archivo: manualFile });
+      setManualModal(null);
+      setManualReload((value) => value + 1);
+    } catch (error) {
+      setManualError(error.response?.data?.message || 'No fue posible guardar el manual.');
+    } finally {
+      setManualSaving(false);
+    }
+  };
+
+  const deleteManual = async (manual) => {
+    if (!window.confirm(`¿Eliminar el manual "${manual.titulo}"?`)) return;
+    try {
+      await intranetAPI.deleteManual(manual.jsonId);
+      setManualReload((value) => value + 1);
+    } catch (error) {
+      setMediaError(error.response?.data?.message || 'No fue posible eliminar el manual.');
+    }
+  };
+
+  const deleteNoticia = async (noticia) => {
+    if (!window.confirm(`¿Eliminar la noticia "${noticia.Titulo}"?`)) return;
+    try {
+      await intranetAPI.deleteNoticia(noticia.Id);
+      await fetchInitialData();
+    } catch (error) {
+      window.alert(error.response?.data?.message || 'No fue posible eliminar la noticia.');
+    }
+  };
+
   const visibleManuals = [
     ...(homeData.manuales ?? []).map((manual) => ({
       id: `documento-${manual.Id}`,
@@ -393,6 +445,7 @@ export const IntranetHomePage = () => {
     })),
     ...mediaCatalog.manuales.map((manual, index) => ({
       id: `pdf-${manual.id ?? index}`,
+      jsonId: manual.id,
       titulo: manual.titulo,
       tipo: manual.categoria || 'Manual técnico',
       version: manual.version,
@@ -462,7 +515,7 @@ export const IntranetHomePage = () => {
 
       {/* Tab: Noticias */}
       {activeTab === 'noticias' && (
-        <NewsFeed noticias={homeData.noticias} />
+        <NewsFeed noticias={homeData.noticias} onDelete={canManageNews ? deleteNoticia : undefined} />
       )}
 
       {activeTab === 'directorio' && <DirectoryPage embedded />}
@@ -881,6 +934,11 @@ export const IntranetHomePage = () => {
               </button>
             ))}
           </div>
+          {canManageDocuments && (
+            <button type="button" onClick={() => openManualModal()} className="inline-flex items-center gap-2 rounded-xl bg-orange-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-orange-700">
+              <Plus size={16} /> Nuevo manual
+            </button>
+          )}
           {mediaError && (
             <div role="alert" className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
               {mediaError}
@@ -894,12 +952,45 @@ export const IntranetHomePage = () => {
                 <h4 className="text-lg font-bold text-slate-800">{manual.titulo}</h4>
                 {manual.version && <p className="text-xs text-slate-400">Versión: {manual.version}</p>}
               </div>
-              <a href={manual.url} target="_blank" rel="noreferrer" className="rounded-xl bg-slate-900 px-4 py-2 text-xs font-semibold text-white hover:bg-slate-800">
-                Ver Manual
-              </a>
+              <div className="flex flex-col items-end gap-2">
+                <a href={manual.url} target="_blank" rel="noreferrer" className="rounded-xl bg-slate-900 px-4 py-2 text-xs font-semibold text-white hover:bg-slate-800">
+                  Ver Manual
+                </a>
+                {canManageDocuments && manual.jsonId && (
+                  <div className="flex gap-2">
+                    <button type="button" onClick={() => deleteManual(manual)} className="rounded-lg bg-red-50 px-3 py-1.5 text-xs font-semibold text-red-700 hover:bg-red-100">Eliminar</button>
+                  </div>
+                )}
+              </div>
             </div>
           ))}
           </div>
+          {manualModal && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" role="dialog" aria-modal="true">
+              <form onSubmit={saveManual} className="w-full max-w-md space-y-4 rounded-3xl bg-white p-6 shadow-xl">
+                <h3 className="text-xl font-bold text-slate-900">{manualModal.id ? 'Editar manual' : 'Nuevo manual'}</h3>
+                {manualError && <div role="alert" className="rounded-xl bg-red-50 px-3 py-2 text-sm text-red-700">{manualError}</div>}
+                <label className="block text-sm font-medium text-slate-700">Título
+                  <input required maxLength={150} value={manualModal.Titulo} onChange={(e) => setManualModal({ ...manualModal, Titulo: e.target.value })} className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2" />
+                </label>
+                <label className="block text-sm font-medium text-slate-700">Categoría
+                  <select value={manualModal.Categoria} onChange={(e) => setManualModal({ ...manualModal, Categoria: e.target.value })} className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2">
+                    {manualCategories.slice(1).map((category) => <option key={category} value={category}>{category}</option>)}
+                  </select>
+                </label>
+                <label className="block text-sm font-medium text-slate-700">Versión
+                  <input maxLength={30} value={manualModal.Version} onChange={(e) => setManualModal({ ...manualModal, Version: e.target.value })} className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2" />
+                </label>
+                <label className="block text-sm font-medium text-slate-700">Archivo PDF{manualModal.id ? ' (opcional)' : ''}
+                  <input type="file" accept="application/pdf" onChange={(e) => setManualFile(e.target.files?.[0] ?? null)} className="mt-1 w-full text-sm" />
+                </label>
+                <div className="flex justify-end gap-2">
+                  <button type="button" onClick={() => setManualModal(null)} className="rounded-xl px-4 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-100">Cancelar</button>
+                  <button type="submit" disabled={manualSaving} className="rounded-xl bg-orange-600 px-4 py-2 text-sm font-semibold text-white hover:bg-orange-700 disabled:opacity-50">{manualSaving ? 'Guardando...' : 'Guardar'}</button>
+                </div>
+              </form>
+            </div>
+          )}
           {visibleManuals.length === 0 && !mediaError && (
             <p className="rounded-2xl border border-dashed border-slate-300 bg-white p-8 text-center text-sm text-slate-500">
               No hay manuales en esta categoría. Agrega los PDF en <code>frontend/public/media/intranet/manuales/pdf/</code> y regístralos en manuales.json.

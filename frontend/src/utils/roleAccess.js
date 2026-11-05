@@ -21,3 +21,8 @@ export const canViewQualityArea = (user, areaId) => {
   if (areaId === 'gestion-humana') return true;
   return roles.some((r) => (AREAS_BY_ROLE[r] ?? []).includes(areaId));
 };
+
+export const canViewHorario = (user) => {
+  if (roleCodes(user).some((r) => ['admin', 'gerencia', 'directivos'].includes(r))) return true;
+  return /jefe/i.test(user?.organization?.CargoNombre ?? user?.CargoNombre ?? '');
+};

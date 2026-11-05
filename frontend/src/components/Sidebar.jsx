@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Home, ShieldCheck, BookOpen, Phone, FileText, Headphones, Shield, ClipboardList, Package, LayoutDashboard, Laptop } from 'lucide-react';
+import { Home, ShieldCheck, BookOpen, Phone, FileText, Headphones, Shield, ClipboardList, Package, LayoutDashboard, Laptop, Clock } from 'lucide-react';
+import { canViewHorario } from '../utils/roleAccess';
 import { useAuth } from '../contexts/AuthContext';
 import { applicationsAPI } from '../services/applicationsAPI';
 import { GESTION_EXTERNAL_URL, usesExternalGestion } from '../utils/gestionAccess';
@@ -75,6 +76,7 @@ export const Sidebar = () => {
     ...(!configuredMenuItems.some((item) => item.href === '/dotacion')
       ? [{ title: 'Dotación', href: '/dotacion', icon: Package, permission: 'solicitudes.ver' }]
       : []),
+    ...(canViewHorario(user) ? [{ title: 'Horario', href: '/horario', icon: Clock }] : []),
   ].map((item) => (
     item.href === '/gestion' && usesExternalGestion(user)
       ? { ...item, href: GESTION_EXTERNAL_URL, external: true }

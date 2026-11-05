@@ -5,8 +5,10 @@ import {
   Boxes,
   Shield,
   Laptop,
-  Package
+  Package,
+  Clock
 } from "lucide-react";
+import { canViewHorario } from "../../../utils/roleAccess";
 import ApplicationCard from "./ApplicationCard";
 import { useAuth } from "../../../contexts/AuthContext";
 import { GESTION_EXTERNAL_URL, usesExternalGestion } from "../../../utils/gestionAccess";
@@ -48,6 +50,14 @@ const ApplicationsSection = () => {
       permission: "solicitudes.ver"
     },
     {
+      title: "Horario",
+      description: "Control de entradas, salidas y ausencias del personal.",
+      icon: Clock,
+      color: "#0ea5e9",
+      to: "/horario",
+      visible: canViewHorario(user)
+    },
+    {
       title: "Gestión Tecnológica",
       description: "Consulta y crea tickets de incidencias tecnológicas.",
       icon: Laptop,
@@ -79,6 +89,7 @@ const ApplicationsSection = () => {
   // Inventario y Seguridad se ocultan hasta que se implementen.
   const visibleApplications = applications.filter(app => {
     if (app.comingSoon) return false;
+    if (app.visible !== undefined) return app.visible;
     if (!app.permission) return true;
     if (isSuperAdmin) return true;
     const requiredPermissions = Array.isArray(app.permission) ? app.permission : [app.permission];

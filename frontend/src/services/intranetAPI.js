@@ -29,4 +29,16 @@ export const intranetAPI = {
   createNoticia: (data) => api.post('/intranet/noticias', data, data instanceof FormData
     ? { headers: { 'Content-Type': 'multipart/form-data' } }
     : undefined),
+  deleteNoticia: (id) => api.delete(`/intranet/noticias/${id}`),
+  saveManual: (id, values) => {
+    const body = new FormData();
+    body.append('Titulo', values.Titulo);
+    body.append('Categoria', values.Categoria);
+    body.append('Version', values.Version ?? '');
+    if (values.Archivo) body.append('Archivo', values.Archivo);
+    return api.post(id ? `/intranet/manuales/${encodeURIComponent(id)}` : '/intranet/manuales', body, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+  },
+  deleteManual: (id) => api.delete(`/intranet/manuales/${encodeURIComponent(id)}`),
 };

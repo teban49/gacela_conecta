@@ -1,5 +1,5 @@
 import React from 'react';
-import { Newspaper } from 'lucide-react';
+import { Newspaper, Trash2 } from 'lucide-react';
 
 const formatDate = (value) => {
   const date = new Date(value);
@@ -14,7 +14,7 @@ const initialsOf = (noticia) => {
 };
 
 // Las noticias se muestran como publicaciones completas, sin abrir otra página
-export const NewsFeed = ({ noticias }) => {
+export const NewsFeed = ({ noticias, onDelete }) => {
   if (!noticias.length) {
     return (
       <div className="mx-auto max-w-2xl rounded-3xl border border-slate-200 bg-white p-12 text-center text-slate-500">
@@ -38,6 +38,16 @@ export const NewsFeed = ({ noticias }) => {
                 <p className="text-xs text-slate-500">{formatDate(noticia.FechaPublicacion)}</p>
               </div>
               <Newspaper size={16} className="ml-auto text-slate-300" aria-hidden="true" />
+              {onDelete && (
+                <button
+                  type="button"
+                  onClick={() => onDelete(noticia)}
+                  aria-label={`Eliminar noticia ${noticia.Titulo}`}
+                  className="rounded-lg p-2 text-red-600 hover:bg-red-50"
+                >
+                  <Trash2 size={16} />
+                </button>
+              )}
             </header>
 
             <div className="space-y-2 px-5 py-4">
