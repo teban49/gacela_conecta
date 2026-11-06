@@ -116,6 +116,11 @@ Router::get('/api/v1/security/job-titles', function () {
     $controller->jobTitles();
 }, ['jwt', 'seguridad.ver']);
 
+Router::get('/api/v1/security/user-catalogs', function () {
+    $controller = new UserController();
+    $controller->catalogs();
+}, ['jwt', 'seguridad.administrar_usuarios']);
+
 Router::get('/api/v1/security/users', function () {
     $controller = new UserController();
     $controller->index();
@@ -139,6 +144,11 @@ Router::put('/api/v1/security/users/{id}', function (int $id) {
 Router::patch('/api/v1/security/users/{id}/status', function (int $id) {
     $controller = new UserController();
     $controller->changeStatus($id);
+}, ['jwt', 'seguridad.administrar_usuarios']);
+
+Router::delete('/api/v1/security/users/{id}', function (int $id) {
+    $controller = new UserController();
+    $controller->destroy($id);
 }, ['jwt', 'seguridad.administrar_usuarios']);
 
 Router::post('/api/v1/security/users/{id}/roles', function (int $id) {

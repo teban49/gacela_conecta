@@ -76,6 +76,28 @@ class UserController
         }
     }
 
+    public function catalogs(): void
+    {
+        Response::success($this->service->getCatalogs(), 'Catálogos obtenidos correctamente.');
+    }
+
+    public function destroy(int $id): void
+    {
+        $current = \App\Core\Auth::user();
+        if ((int) ($current['Id'] ?? $current['id'] ?? 0) === $id) {
+            Response::error('No puedes eliminar tu propio usuario.');
+            return;
+        }
+
+        $result = $this->service->delete($id);
+
+        if ($result['success']) {
+            Response::success(null, $result['message']);
+        } else {
+            Response::error($result['message']);
+        }
+    }
+
     public function setRole(int $id): void
     {
         $data = Request::json();

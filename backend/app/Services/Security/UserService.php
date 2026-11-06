@@ -96,6 +96,29 @@ class UserService
         ];
     }
 
+    public function getCatalogs(): array
+    {
+        return $this->repository->getCatalogs();
+    }
+
+    public function delete(int $id): array
+    {
+        if (!$this->repository->getById($id)) {
+            return ['success' => false, 'message' => 'El usuario no existe.'];
+        }
+
+        try {
+            $this->repository->deleteUser($id);
+        } catch (\PDOException $e) {
+            return [
+                'success' => false,
+                'message' => 'El usuario tiene registros asociados (solicitudes, activos, etc.) y no se puede eliminar. Desactívalo en su lugar.',
+            ];
+        }
+
+        return ['success' => true, 'message' => 'Usuario eliminado correctamente.'];
+    }
+
     public function setRole(int $id, int $roleId): array
     {
         $user = $this->repository->getById($id);

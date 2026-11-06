@@ -72,6 +72,24 @@ class UserRepository extends BaseRepository
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
     }
 
+    public function getCatalogs(): array
+    {
+        $fetch = fn (string $sql) => $this->db->query($sql)->fetchAll(PDO::FETCH_ASSOC);
+
+        return [
+            'empresas' => $fetch('SELECT Id, Nombre FROM gcp_empresas ORDER BY Id'),
+            'agencias' => $fetch('SELECT Id, Nombre FROM gcp_agencias WHERE Estado = 1 ORDER BY Nombre'),
+            'cargos' => $fetch('SELECT Id, Nombre, RolId FROM gcp_cargos WHERE Estado = 1 ORDER BY Nombre'),
+            'roles' => $fetch('SELECT Id, Codigo, Nombre FROM gcp_roles WHERE Estado = 1 ORDER BY Nombre'),
+        ];
+    }
+
+    public function deleteUser(int $id): bool
+    {
+        $stmt = $this->db->prepare("DELETE FROM {$this->table} WHERE Id = :id");
+        return $stmt->execute([':id' => $id]);
+    }
+
     public function setRole(int $userId, int $roleId): bool
     {
         $stmt = $this->db->prepare("

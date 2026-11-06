@@ -33,4 +33,6 @@ export const securityAPI = {
   updateUser: (id, data) => api.put(`/security/users/${id}`, data),
   changeUserStatus: (id, status) => api.patch(`/security/users/${id}/status`, { Estado: status }),
   setUserRole: (userId, roleId) => api.post(`/security/users/${userId}/roles`, { RolId: roleId }),
+  deleteUser: (id) => api.delete(`/security/users/${id}`),
+  getUserCatalogs: () => api.get('/security/user-catalogs'),
 };

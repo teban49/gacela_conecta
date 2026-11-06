@@ -6,7 +6,8 @@ import {
   Shield,
   Laptop,
   Package,
-  Clock
+  Clock,
+  UsersRound
 } from "lucide-react";
 import { canViewHorario } from "../../../utils/roleAccess";
 import ApplicationCard from "./ApplicationCard";
@@ -56,6 +57,14 @@ const ApplicationsSection = () => {
       color: "#0ea5e9",
       to: "/horario",
       visible: canViewHorario(user)
+    },
+    {
+      title: "Administración",
+      description: "Creación, edición y eliminación de usuarios del sistema.",
+      icon: UsersRound,
+      color: "#e11d48",
+      to: "/administracion",
+      visible: !!isSuperAdmin
     },
     {
       title: "Gestión Tecnológica",

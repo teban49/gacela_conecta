@@ -9,6 +9,7 @@ import SolicitudesPage from '../modules/solicitudes/pages/SolicitudesPage';
 import GestionPage from '../modules/gestion/pages/GestionPage';
 import DotacionPage from '../modules/dotacion/pages/DotacionPage';
 import HorarioPage from '../modules/horario/pages/HorarioPage';
+import AdminUsersPage from '../modules/admin/pages/AdminUsersPage';
 import PermissionRoute from './PermissionRoute';
 import MainLayout from '../components/MainLayout';
 import { usesExternalGestion, GESTION_EXTERNAL_URL } from '../utils/gestionAccess';
@@ -153,6 +154,14 @@ const router = createBrowserRouter([
         element: (
           <PermissionRoute>
             <HorarioPage />
+          </PermissionRoute>
+        ),
+      },
+      {
+        path: '/administracion',
+        element: (
+          <PermissionRoute>
+            <AdminUsersPage />
           </PermissionRoute>
         ),
       },
