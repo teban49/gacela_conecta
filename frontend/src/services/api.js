@@ -70,6 +70,8 @@ export const authAPI = {
   verifyToken: (token) => api.post('/auth/verify-token', { token }),
   getMe: () => api.get('/auth/me'),
   logout: () => api.post('/auth/logout'),
+  login: (usuario, password) => api.post('/auth/login', { usuario, password }),
+  updateProfile: (data) => api.put('/auth/profile', data),
 };
 
 export default api;

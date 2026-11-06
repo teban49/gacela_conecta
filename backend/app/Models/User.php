@@ -19,6 +19,20 @@ class User
 
     public function findByEmail(string $email): ?array
     {
+        return $this->findByColumn('EmailCorporativo', $email);
+    }
+
+    public function findByUsername(string $username): ?array
+    {
+        return $this->findByColumn('Usuario', $username);
+    }
+
+    private function findByColumn(string $column, string $value): ?array
+    {
+        if (!in_array($column, ['EmailCorporativo', 'Usuario'], true)) {
+            throw new \InvalidArgumentException('Columna de búsqueda no permitida.');
+        }
+
         $stmt = $this->db->prepare("
             SELECT u.*, 
                    a.Nombre as AgenciaNombre,
@@ -38,12 +52,12 @@ class User
             LEFT JOIN gcp_roles r ON u.RolId = r.Id
             LEFT JOIN gcp_usuariosempresas ue ON u.Id = ue.UsuarioId
             LEFT JOIN gcp_empresas e ON ue.EmpresaId = e.Id
-            WHERE u.EmailCorporativo = :email AND u.Estado = :estado
+            WHERE u.`{$column}` = :value AND u.Estado = :estado
             GROUP BY u.Id
         ");
         
         $stmt->execute([
-            'email' => $email,
+            'value' => $value,
             'estado' => self::STATE_ACTIVE
         ]);
 

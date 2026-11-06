@@ -57,7 +57,7 @@ class SolicitudLaboralRepository extends BaseRepository
 
     public function getRequesterId(int $requestId): ?int
     {
-        $stmt = $this->db->prepare('SELECT UsuarioId FROM gcp_solicitudes WHERE Id = :Id');
+        $stmt = $this->db->prepare('SELECT COALESCE(CreadoPorId, UsuarioId) FROM gcp_solicitudes WHERE Id = :Id');
         $stmt->execute([':Id' => $requestId]);
         $id = $stmt->fetchColumn();
 
@@ -194,8 +194,8 @@ class SolicitudLaboralRepository extends BaseRepository
 
     public function getMine(int $userId): array
     {
-        $stmt = $this->db->prepare($this->selectSql() . ' WHERE s.UsuarioId = :userId ORDER BY s.FechaCreacion DESC');
-        $stmt->execute([':userId' => $userId]);
+        $stmt = $this->db->prepare($this->selectSql() . ' WHERE (s.UsuarioId = :userId OR s.CreadoPorId = :creatorId) ORDER BY s.FechaCreacion DESC');
+        $stmt->execute([':userId' => $userId, ':creatorId' => $userId]);
 
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
     }
@@ -204,7 +204,7 @@ class SolicitudLaboralRepository extends BaseRepository
     {
         $stmt = $this->db->prepare(
             $this->selectSql() . "
-            WHERE (s.NivelActual = 1 AND s.UsuarioId <> :requesterId AND s.AprobadorCargoId = (
+            WHERE (s.NivelActual = 1 AND s.UsuarioId <> :requesterId AND (s.CreadoPorId IS NULL OR s.CreadoPorId <> :creatorId) AND s.AprobadorCargoId = (
                     SELECT u.CargoId FROM gcp_usuarios u WHERE u.Id = :userId AND u.Estado = 1
                 ) AND s.EstadoSolicitud = 'Pendiente_Jefe')
                OR (s.UsuarioId <> :hrRequesterId AND s.NivelActual = 2 AND :isHr = 1 AND s.EstadoSolicitud = 'Pendiente_RRHH')
@@ -214,6 +214,7 @@ class SolicitudLaboralRepository extends BaseRepository
         $stmt->execute([
             ':userId' => $userId,
             ':requesterId' => $userId,
+            ':creatorId' => $userId,
             ':hrRequesterId' => $userId,
             ':managementRequesterId' => $userId,
             ':isHr' => $isHr ? 1 : 0,
@@ -264,6 +265,7 @@ class SolicitudLaboralRepository extends BaseRepository
             WHERE s.Id = :Id
               AND (
                     s.UsuarioId = :requesterId
+                 OR s.CreadoPorId = :creatorViewId
                  OR (s.EstadoNomina IS NOT NULL AND :isPayroll = 1)
                  OR (
                     s.UsuarioId <> :cargoRequesterId
@@ -285,6 +287,7 @@ class SolicitudLaboralRepository extends BaseRepository
         $stmt->execute([
             ':Id' => $requestId,
             ':requesterId' => $userId,
+            ':creatorViewId' => $userId,
             ':cargoRequesterId' => $userId,
             ':approverId' => $userId,
             ':historyUserId' => $userId,
@@ -305,14 +308,15 @@ class SolicitudLaboralRepository extends BaseRepository
         try {
             $stmt = $this->db->prepare("
                 INSERT INTO gcp_solicitudes
-                        (UsuarioId, AprobadorCargoId, TipoId, Asunto, Descripcion, FechaInicio, FechaFin, EmpresaSolicitudId,
+                        (UsuarioId, CreadoPorId, AprobadorCargoId, TipoId, Asunto, Descripcion, FechaInicio, FechaFin, EmpresaSolicitudId,
                      FechaReintegro, DiasDinero, DiasDisfrute, PeriodoPendiente, EstadoSolicitud, NivelActual)
                 VALUES
-                        (:UsuarioId, :AprobadorCargoId, :TipoId, :Asunto, :Descripcion, :FechaInicio, :FechaFin, :EmpresaSolicitudId,
+                        (:UsuarioId, :CreadoPorId, :AprobadorCargoId, :TipoId, :Asunto, :Descripcion, :FechaInicio, :FechaFin, :EmpresaSolicitudId,
                      :FechaReintegro, :DiasDinero, :DiasDisfrute, :PeriodoPendiente, 'Pendiente_Jefe', 1)
             ");
             $stmt->execute([
                 ':UsuarioId' => $data['UsuarioId'],
+                ':CreadoPorId' => $data['CreadoPorId'] ?? null,
                 ':AprobadorCargoId' => $data['AprobadorCargoId'],
                 ':TipoId' => $data['TipoId'],
                 ':Asunto' => $data['Asunto'],
@@ -331,7 +335,7 @@ class SolicitudLaboralRepository extends BaseRepository
                 INSERT INTO gcp_solicitudhistorial (SolicitudId, UsuarioId, Accion, Comentario, Nivel)
                 VALUES (:SolicitudId, :UsuarioId, 'Creada', NULL, 1)
             ");
-            $history->execute([':SolicitudId' => $id, ':UsuarioId' => $data['UsuarioId']]);
+            $history->execute([':SolicitudId' => $id, ':UsuarioId' => $data['CreadoPorId'] ?? $data['UsuarioId']]);
 
             if (!empty($data['Adjunto'])) {
                 $attachment = $this->db->prepare("
@@ -378,7 +382,7 @@ class SolicitudLaboralRepository extends BaseRepository
             $level = (int) $request['NivelActual'];
             $currentStatus = $request['EstadoSolicitud'];
             $expectedStatus = [1 => 'Pendiente_Jefe', 2 => 'Pendiente_RRHH', 3 => 'Pendiente_Gerencia'][$level] ?? '';
-            $authorized = (int) $request['UsuarioId'] !== $userId && match ($level) {
+            $authorized = (int) $request['UsuarioId'] !== $userId && (int) ($request['CreadoPorId'] ?? 0) !== $userId && match ($level) {
                 1 => (int) $request['AprobadorCargoId'] > 0
                     && (int) $request['AprobadorCargoId'] === (int) $request['UsuarioCargoId'],
                 2 => in_array('rrhh', $roles, true),
@@ -440,7 +444,7 @@ class SolicitudLaboralRepository extends BaseRepository
             ]);
 
             $this->db->commit();
-            return ['EstadoSolicitud' => $nextStatus, 'NivelActual' => $nextLevel, 'SolicitanteId' => (int) $request['UsuarioId']];
+            return ['EstadoSolicitud' => $nextStatus, 'NivelActual' => $nextLevel, 'SolicitanteId' => (int) ($request['CreadoPorId'] ?? $request['UsuarioId'])];
         } catch (\Throwable $e) {
             if ($this->db->inTransaction()) {
                 $this->db->rollBack();
@@ -465,7 +469,7 @@ class SolicitudLaboralRepository extends BaseRepository
     private function selectSql(): string
     {
         return "
-            SELECT s.Id, s.UsuarioId, s.AprobadorCargoId, s.TipoId, s.Asunto, s.Descripcion,
+            SELECT s.Id, s.UsuarioId, s.CreadoPorId, s.AprobadorCargoId, s.TipoId, s.Asunto, s.Descripcion,
                    s.FechaInicio, s.FechaFin, s.EstadoSolicitud, s.NivelActual,
                    s.MotivoRechazo, s.FechaCreacion, s.FechaActualizacion,
                    s.FechaReintegro, s.DiasDinero, s.DiasDisfrute, s.PeriodoPendiente, s.EstadoNomina,

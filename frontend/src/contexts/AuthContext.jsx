@@ -102,6 +102,11 @@ export const AuthProvider = ({ children }) => {
     await validateSession();
   };
 
+  const updateUser = (currentUser) => {
+    setUser(currentUser);
+    localStorage.setItem('user_data', JSON.stringify(currentUser));
+  };
+
   return (
     <AuthContext.Provider
       value={{
@@ -113,6 +118,7 @@ export const AuthProvider = ({ children }) => {
         hasPermission,
         hasRole,
         refreshUserData,
+        updateUser,
       }}
     >
       {children}

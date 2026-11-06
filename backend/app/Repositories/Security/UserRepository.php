@@ -18,6 +18,7 @@ class UserRepository extends BaseRepository
                    MIN(ue.EmpresaId) AS EmpresaId,
                    GROUP_CONCAT(DISTINCT ue.EmpresaId ORDER BY ue.EmpresaId) AS EmpresasIds,
                    u.Nombres, u.Apellidos, u.Cedula, u.EmailCorporativo, u.Telefono, u.Estado,
+                   u.Usuario, u.FechaNacimiento, u.Extension, u.Direccion, u.Area,
                    r.Id AS RolId,
                    r.Nombre AS RolNombre,
                    r.Codigo AS RolCodigo,
@@ -109,29 +110,35 @@ class UserRepository extends BaseRepository
     public function create(array $user): int
     {
         $sql = "
-            INSERT INTO {$this->table} (AgenciaId, CargoId, RolId,             CargoJefeDirectoId, Nombres, Apellidos, Cedula, EmailCorporativo, Telefono, Estado)
+            INSERT INTO {$this->table} (AgenciaId, CargoId, RolId, CargoJefeDirectoId, Nombres, Apellidos, Cedula,
+                                        EmailCorporativo, Usuario, PasswordHash, FechaNacimiento, Extension, Direccion, Area,
+                                        Telefono, Estado)
             VALUES (
                 :AgenciaId, :CargoId,
-                (SELECT Id FROM gcp_roles WHERE Codigo = 'usuario' AND Estado = 1 LIMIT 1),
-                            :CargoJefeDirectoId, :Nombres, :Apellidos, :Cedula, :EmailCorporativo, :Telefono, :Estado
+                COALESCE((SELECT RolId FROM gcp_cargos WHERE Id = :CargoRolId AND Estado = 1),
+                         (SELECT Id FROM gcp_roles WHERE Codigo = 'usuario' AND Estado = 1 LIMIT 1)),
+                :CargoJefeDirectoId, :Nombres, :Apellidos, :Cedula,
+                :EmailCorporativo, :Usuario, :PasswordHash, :FechaNacimiento, :Extension, :Direccion, :Area,
+                :Telefono, :Estado
             )
         ";
 
         $companyIds = $this->getCompanyIds($user);
+        $extra = $this->personFields($user, null);
         $this->db->beginTransaction();
         try {
             $stmt = $this->db->prepare($sql);
             $stmt->execute([
                 ':AgenciaId' => $user['AgenciaId'],
                 ':CargoId' => $user['CargoId'],
+                ':CargoRolId' => $user['CargoId'],
                 ':CargoJefeDirectoId' => $this->normalizeManagerCargoId($user['CargoJefeDirectoId'] ?? null),
                 ':Nombres' => $user['Nombres'],
                 ':Apellidos' => $user['Apellidos'],
                 ':Cedula' => $this->normalizeCedula($user['Cedula'] ?? null),
-                ':EmailCorporativo' => $user['EmailCorporativo'],
                 ':Telefono' => $user['Telefono'] ?? null,
                 ':Estado' => $user['Estado'] ?? 1,
-            ]);
+            ] + $extra);
 
             $userId = (int)$this->db->lastInsertId();
             $this->replaceCompanies($userId, $companyIds);
@@ -158,6 +165,12 @@ class UserRepository extends BaseRepository
                 Apellidos = :Apellidos,
                 Cedula = :Cedula,
                 EmailCorporativo = :EmailCorporativo,
+                Usuario = :Usuario,
+                PasswordHash = COALESCE(:PasswordHash, PasswordHash),
+                FechaNacimiento = :FechaNacimiento,
+                Extension = :Extension,
+                Direccion = :Direccion,
+                Area = :Area,
                 Telefono = :Telefono,
                 Estado = :Estado
             WHERE Id = :Id
@@ -165,6 +178,7 @@ class UserRepository extends BaseRepository
 
         $syncCompanies = array_key_exists('EmpresaId', $user) || array_key_exists('EmpresaIds', $user);
         $companyIds = $syncCompanies ? $this->getCompanyIds($user) : [];
+        $extra = $this->personFields($user, $id);
 
         $this->db->beginTransaction();
         try {
@@ -177,10 +191,9 @@ class UserRepository extends BaseRepository
                 ':Nombres' => $user['Nombres'],
                 ':Apellidos' => $user['Apellidos'],
                 ':Cedula' => $this->normalizeCedula($user['Cedula'] ?? null),
-                ':EmailCorporativo' => $user['EmailCorporativo'],
                 ':Telefono' => $user['Telefono'] ?? null,
                 ':Estado' => $user['Estado'] ?? 1,
-            ]);
+            ] + $extra);
 
             if ($updated && $syncCompanies) {
                 $this->replaceCompanies($id, $companyIds);
@@ -193,6 +206,108 @@ class UserRepository extends BaseRepository
                 $this->db->rollBack();
             }
             throw $e;
+        }
+    }
+
+    /**
+     * Campos de persona comunes a crear/editar. Los usuarios sin correo (conductores, etc.)
+     * reciben usuario inicial.apellido y contraseña igual a su cédula; los taquilleros no tienen acceso.
+     */
+    private function personFields(array $user, ?int $id): array
+    {
+        $text = static function ($v, int $max): ?string {
+            $v = is_scalar($v) ? trim((string) $v) : '';
+            return $v === '' ? null : substr($v, 0, $max);
+        };
+
+        $email = $text($user['EmailCorporativo'] ?? null, 150);
+        if ($email !== null && !filter_var($email, FILTER_VALIDATE_EMAIL)) {
+            throw new \InvalidArgumentException('El correo electrónico no es válido.');
+        }
+
+        $birth = $text($user['FechaNacimiento'] ?? null, 10);
+        if ($birth !== null) {
+            $d = \DateTime::createFromFormat('Y-m-d', $birth);
+            if (!$d || $d->format('Y-m-d') !== $birth) {
+                throw new \InvalidArgumentException('La fecha de nacimiento no es válida.');
+            }
+        }
+
+        $existing = $id ? $this->findById($id) : null;
+        $usuario = $existing['Usuario'] ?? null;
+        $passwordHash = null;
+        $cedula = $this->normalizeCedula($user['Cedula'] ?? null);
+
+        $cargoStmt = $this->db->prepare('SELECT Nombre FROM gcp_cargos WHERE Id = :Id');
+        $cargoStmt->execute([':Id' => $user['CargoId']]);
+        $isTaquillero = stripos((string) $cargoStmt->fetchColumn(), 'taquill') === 0;
+
+        if ($email === null) {
+            if ($isTaquillero) {
+                $usuario = null;
+            } else {
+                if ($cedula === null) {
+                    throw new \InvalidArgumentException('Un usuario sin correo requiere cédula para generar su acceso.');
+                }
+                if ($usuario === null) {
+                    $usuario = $this->generateUsername((string) $user['Nombres'], (string) $user['Apellidos'], $id);
+                    $passwordHash = password_hash($cedula, PASSWORD_BCRYPT);
+                }
+            }
+        }
+
+        $password = (string) ($user['Password'] ?? '');
+        if ($password !== '') {
+            if (strlen($password) < 8) {
+                throw new \InvalidArgumentException('La contraseña debe tener al menos 8 caracteres.');
+            }
+            if ($usuario === null) {
+                throw new \InvalidArgumentException('Este usuario no tiene nombre de usuario para contraseña.');
+            }
+            $passwordHash = password_hash($password, PASSWORD_BCRYPT);
+        }
+
+        return [
+            ':EmailCorporativo' => $email,
+            ':Usuario' => $usuario,
+            ':PasswordHash' => $passwordHash,
+            ':FechaNacimiento' => $birth,
+            ':Extension' => $text($user['Extension'] ?? null, 20),
+            ':Direccion' => $text($user['Direccion'] ?? null, 255),
+            ':Area' => $text($user['Area'] ?? null, 100),
+        ];
+    }
+
+    public function generateUsername(string $nombres, string $apellidos, ?int $ignoreId = null): string
+    {
+        $slug = static function (string $s): string {
+            $s = strtr($s, ['á' => 'a', 'é' => 'e', 'í' => 'i', 'ó' => 'o', 'ú' => 'u', 'ü' => 'u', 'ñ' => 'n',
+                'Á' => 'a', 'É' => 'e', 'Í' => 'i', 'Ó' => 'o', 'Ú' => 'u', 'Ü' => 'u', 'Ñ' => 'n']);
+            return preg_replace('/[^a-z0-9]/', '', strtolower($s));
+        };
+
+        $first = $slug(preg_split('/\s+/', trim($nombres))[0] ?? '');
+        $tokens = preg_split('/\s+/', trim($apellidos)) ?: [];
+        $particles = ['de', 'del', 'la', 'las', 'los', 'san', 'santa', 'y'];
+        $surname = '';
+        foreach ($tokens as $i => $token) {
+            $surname .= $slug($token);
+            if (!in_array(strtolower($token), $particles, true)) {
+                break;
+            }
+        }
+
+        $base = ($first !== '' ? $first[0] : 'u') . '.' . ($surname !== '' ? $surname : 'usuario');
+        $candidate = $base;
+        $n = 1;
+        $check = $this->db->prepare('SELECT COUNT(*) FROM gcp_usuarios WHERE Usuario = :u AND Id <> :id');
+        while (true) {
+            $check->execute([':u' => $candidate, ':id' => $ignoreId ?? 0]);
+            if ((int) $check->fetchColumn() === 0) {
+                return $candidate;
+            }
+            $n++;
+            $candidate = $base . $n;
         }
     }
 

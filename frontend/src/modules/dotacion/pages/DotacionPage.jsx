@@ -43,6 +43,7 @@ const DotacionPage = () => {
   const [selectedRequest, setSelectedRequest] = useState(null);
   const [comment, setComment] = useState('');
   const [companyId, setCompanyId] = useState('');
+  const [beneficiaryId, setBeneficiaryId] = useState('');
   const [cedulaPlace, setCedulaPlace] = useState('');
   const [view, setView] = useState('solicitudes');
   const [articles, setArticles] = useState([{ Cantidad: '1', Referencia: '', Talla: '' }]);
@@ -87,7 +88,24 @@ const DotacionPage = () => {
   const requester = dashboard?.Opciones ?? {};
   const myRequests = dashboard?.MisSolicitudes ?? [];
   const pendingRequests = dashboard?.Pendientes ?? [];
-  const canCreate = useMemo(() => (requester.Empresas ?? []).length > 0, [requester.Empresas]);
+  const beneficiaries = dashboard?.Beneficiarios ?? [];
+  const beneficiary = beneficiaries.find((item) => String(item.Id) === String(beneficiaryId));
+  const companyOptions = useMemo(() => {
+    const all = requester.Empresas ?? [];
+    if (!beneficiary) return all;
+    const ids = String(beneficiary.EmpresasIds ?? '').split(',');
+    return all.filter((company) => ids.includes(String(company.Id)));
+  }, [requester.Empresas, beneficiary]);
+  const canCreate = companyOptions.length > 0 || (beneficiary && (requester.Empresas ?? []).length > 0);
+
+  const changeBeneficiary = (value) => {
+    setBeneficiaryId(value);
+    const target = beneficiaries.find((item) => String(item.Id) === String(value));
+    const all = requester.Empresas ?? [];
+    const ids = target ? String(target.EmpresasIds ?? '').split(',') : null;
+    const options = ids ? all.filter((company) => ids.includes(String(company.Id))) : all;
+    setCompanyId(String(options[0]?.Id ?? ''));
+  };
 
   const changeArticle = (index, key, value) => {
     setArticles((current) => current.map((item, itemIndex) => (
@@ -102,6 +120,7 @@ const DotacionPage = () => {
     try {
       await dotacionAPI.createRequest({
         EmpresaId: companyId,
+        ...(beneficiaryId ? { BeneficiarioId: Number(beneficiaryId) } : {}),
         CedulaExpedidaEn: cedulaPlace.trim(),
         Articulos: articles.map((item) => ({
           Cantidad: Number(item.Cantidad),
@@ -209,18 +228,26 @@ const DotacionPage = () => {
         {formError && <p role="alert" className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">{formError}</p>}
 
         <div className="grid gap-4 sm:grid-cols-2">
+          {beneficiaries.length > 0 && (
+            <label className="text-sm font-semibold text-slate-700 sm:col-span-2">Solicitar para
+              <select value={beneficiaryId} onChange={(event) => changeBeneficiary(event.target.value)} className="mt-2 w-full rounded-xl border border-slate-200 bg-white px-4 py-3">
+                <option value="">Para mí</option>
+                {beneficiaries.map((item) => <option key={item.Id} value={item.Id}>{item.Nombres} {item.Apellidos}{item.Cedula ? ` - ${item.Cedula}` : ''}</option>)}
+              </select>
+            </label>
+          )}
           <label className="text-sm font-semibold text-slate-700">Solicitante
-            <input readOnly value={`${requester.Nombres ?? ''} ${requester.Apellidos ?? ''}`.trim()} className="mt-2 w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 font-normal" />
+            <input readOnly value={beneficiary ? `${beneficiary.Nombres} ${beneficiary.Apellidos}` : `${requester.Nombres ?? ''} ${requester.Apellidos ?? ''}`.trim()} className="mt-2 w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 font-normal" />
           </label>
           <label className="text-sm font-semibold text-slate-700">Cédula
-            <input readOnly value={requester.Cedula ?? ''} className="mt-2 w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 font-normal" />
+            <input readOnly value={beneficiary ? (beneficiary.Cedula ?? '') : (requester.Cedula ?? '')} className="mt-2 w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 font-normal" />
           </label>
           <label className="text-sm font-semibold text-slate-700">Cargo
-            <input readOnly value={requester.Cargo ?? ''} className="mt-2 w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 font-normal" />
+            <input readOnly value={beneficiary ? 'Taquillero/a' : (requester.Cargo ?? '')} className="mt-2 w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 font-normal" />
           </label>
           <label className="text-sm font-semibold text-slate-700">Empresa <span className="text-red-600">*</span>
             <select required value={companyId} onChange={(event) => setCompanyId(event.target.value)} className="mt-2 w-full rounded-xl border border-slate-200 bg-white px-4 py-3">
-              {(requester.Empresas ?? []).map((company) => <option key={company.Id} value={company.Id}>{company.Nombre}</option>)}
+              {companyOptions.map((company) => <option key={company.Id} value={company.Id}>{company.Nombre}</option>)}
             </select>
           </label>
           <label className="text-sm font-semibold text-slate-700 sm:col-span-2">Lugar de expedición de la cédula <span className="text-red-600">*</span>

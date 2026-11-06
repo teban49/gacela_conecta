@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Repositories\BeneficiaryRepository;
 use App\Repositories\DotacionRepository;
 use App\Repositories\NotificacionRepository;
 
@@ -20,6 +21,7 @@ class DotacionService
     {
         return [
             'Opciones' => $this->repository->getCreateOptions($userId),
+            'Beneficiarios' => (new BeneficiaryRepository())->getTaquilleros($userId),
             'MisSolicitudes' => $this->repository->getMine($userId),
             'Pendientes' => $this->repository->getPending($userId),
             'PuedeVerEntregas' => $this->repository->canViewDeliveries($userId, $isAdmin),
@@ -44,7 +46,7 @@ class DotacionService
         }
         $request = $this->repository->getById($requestId);
         if ($request) {
-            $request['EsSolicitante'] = (int) $request['UsuarioId'] === $userId;
+            $request['EsSolicitante'] = (int) $request['UsuarioId'] === $userId || (int) ($request['CreadoPorId'] ?? 0) === $userId;
             $request['EsCoordinador'] = (int) $request['CoordinadorId'] === $userId;
             $request['EsJefeGestionHumana'] = (int) $request['JefeGestionHumanaId'] === $userId;
             $request['HistorialEntregas'] = ($request['EsCoordinador'] || $request['EsJefeGestionHumana'])
@@ -57,6 +59,16 @@ class DotacionService
 
     public function create(int $userId, array $data): array
     {
+        $creatorId = null;
+        $beneficiaryId = filter_var($data['BeneficiarioId'] ?? null, FILTER_VALIDATE_INT);
+        if ($beneficiaryId !== false && $beneficiaryId !== null && $beneficiaryId !== $userId) {
+            if (!(new BeneficiaryRepository())->canRequestFor($userId, $beneficiaryId)) {
+                return ['success' => false, 'status' => 403, 'message' => 'No puedes registrar dotación para ese empleado.'];
+            }
+            $creatorId = $userId;
+            $userId = $beneficiaryId;
+        }
+
         $options = $this->repository->getCreateOptions($userId);
         $errors = [];
         $companyId = filter_var($data['EmpresaId'] ?? null, FILTER_VALIDATE_INT);
@@ -126,7 +138,7 @@ class DotacionService
         $jefeId = $approvers['EsFlota'] ? $humanResourcesManagerId : null;
         $id = $this->repository->create([
             'UsuarioId' => $userId,
-            'EmpresaId' => (int) $company['Id'],
+            'CreadoPorId' => $creatorId,
             'CedulaExpedidaEn' => $place,
             'CoordinadorId' => (int) $approvers['Coordinador']['Id'],
         ], $items, $jefeId, $humanResourcesManagerId);

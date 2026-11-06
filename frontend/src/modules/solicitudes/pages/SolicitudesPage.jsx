@@ -73,6 +73,7 @@ const SolicitudesPage = () => {
   const [payrollRole, setPayrollRole] = useState(null);
   const [payrollRequests, setPayrollRequests] = useState([]);
   const [companies, setCompanies] = useState([]);
+  const [beneficiaries, setBeneficiaries] = useState([]);
   const [payrollFile, setPayrollFile] = useState(null);
   const [payrollComment, setPayrollComment] = useState('');
   const emptyForm = {
@@ -83,6 +84,7 @@ const SolicitudesPage = () => {
     FechaFin: '',
     FechaReintegro: '',
     EmpresaId: '',
+    BeneficiarioId: '',
     DiasDinero: '0',
     DiasDisfrute: '0',
     PeriodoPendiente: '',
@@ -108,6 +110,12 @@ const SolicitudesPage = () => {
       const loadedCompanies = companiesResponse.data?.data ?? [];
       setTypes(loadedTypes);
       setCompanies(loadedCompanies);
+      try {
+        const beneficiariesResponse = await solicitudesAPI.getLaboralBeneficiaries();
+        setBeneficiaries(beneficiariesResponse.data?.data ?? []);
+      } catch {
+        setBeneficiaries([]);
+      }
       setMyRequests(mineResponse.data?.data ?? []);
       setPendingRequests(pendingResponse.data?.data ?? []);
       try {
@@ -182,6 +190,7 @@ const SolicitudesPage = () => {
     setFormError('');
 
     const body = new FormData();
+    if (formData.BeneficiarioId) body.append('BeneficiarioId', formData.BeneficiarioId);
     body.append('TipoId', formData.TipoId);
     body.append('Asunto', formData.Asunto.trim());
     body.append('Descripcion', formData.Descripcion.trim());
@@ -322,11 +331,37 @@ const SolicitudesPage = () => {
       </div>
       {formError && <div role="alert" className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">{formError}</div>}
       <div className="grid gap-5 sm:grid-cols-2">
+        {beneficiaries.length > 0 && (
+          <label className="text-sm font-semibold text-slate-700 sm:col-span-2">
+            Solicitar para
+            <select
+              value={formData.BeneficiarioId}
+              onChange={async (event) => {
+                const value = event.target.value;
+                setFormData((current) => ({ ...current, BeneficiarioId: value, EmpresaId: '' }));
+                try {
+                  const response = await solicitudesAPI.getLaboralCompanies(value);
+                  const list = response.data?.data ?? [];
+                  setCompanies(list);
+                  setFormData((current) => ({ ...current, EmpresaId: list[0] ? String(list[0].Id) : '' }));
+                } catch {
+                  setCompanies([]);
+                }
+              }}
+              className="mt-2 w-full rounded-xl border border-slate-200 bg-white px-4 py-3"
+            >
+              <option value="">Para mí</option>
+              {beneficiaries.map((b) => (
+                <option key={b.Id} value={b.Id}>{b.Nombres} {b.Apellidos}{b.Cedula ? ` - ${b.Cedula}` : ''}</option>
+              ))}
+            </select>
+          </label>
+        )}
         <label className="text-sm font-semibold text-slate-700">
           Solicitante
           <input
             readOnly
-            value={[user?.Nombres ?? user?.nombres, user?.Apellidos ?? user?.apellidos].filter(Boolean).join(' ') || user?.email || ''}
+            value={(formData.BeneficiarioId ? (() => { const b = beneficiaries.find((x) => String(x.Id) === String(formData.BeneficiarioId)); return b ? `${b.Nombres} ${b.Apellidos}` : ''; })() : '') || [user?.Nombres ?? user?.nombres, user?.Apellidos ?? user?.apellidos].filter(Boolean).join(' ') || user?.email || ''}
             className="mt-2 w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 font-normal"
           />
         </label>
@@ -405,7 +440,7 @@ const SolicitudesPage = () => {
               Cédula de ciudadanía
               <input
                 readOnly
-                value={user?.cedula ?? ''}
+                value={(formData.BeneficiarioId ? beneficiaries.find((b) => String(b.Id) === String(formData.BeneficiarioId))?.Cedula : user?.cedula) ?? ''}
                 placeholder="Sin cédula registrada"
                 className="mt-2 w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 font-normal"
               />

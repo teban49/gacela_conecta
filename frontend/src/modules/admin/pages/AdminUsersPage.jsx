@@ -5,6 +5,7 @@ import { securityAPI } from '../../security/services/securityAPI';
 
 const emptyForm = {
   Nombres: '', Apellidos: '', Cedula: '', EmailCorporativo: '', Telefono: '',
+  FechaNacimiento: '', Extension: '', Direccion: '', Area: '', Password: '',
   EmpresaIds: [], AgenciaId: '', CargoId: '', CargoJefeDirectoId: '', RolId: '', Estado: 1,
 };
 
@@ -30,6 +31,7 @@ export const AdminUsersPage = () => {
   const [form, setForm] = useState(null);
   const [editingId, setEditingId] = useState(null);
   const [saving, setSaving] = useState(false);
+  const [visible, setVisible] = useState(100);
 
   const load = async () => {
     setLoading(true);
@@ -51,7 +53,7 @@ export const AdminUsersPage = () => {
     return users.filter((u) => {
       if (companyFilter && !String(u.EmpresasIds ?? '').split(',').includes(companyFilter)) return false;
       if (!term) return true;
-      return `${u.Nombres} ${u.Apellidos} ${u.Cedula ?? ''} ${u.EmailCorporativo}`.toLowerCase().includes(term);
+      return `${u.Nombres} ${u.Apellidos} ${u.Cedula ?? ''} ${u.EmailCorporativo ?? ''} ${u.Usuario ?? ''}`.toLowerCase().includes(term);
     });
   }, [users, search, companyFilter]);
 
@@ -67,6 +69,8 @@ export const AdminUsersPage = () => {
     setForm({
       Nombres: u.Nombres ?? '', Apellidos: u.Apellidos ?? '', Cedula: u.Cedula ?? '',
       EmailCorporativo: u.EmailCorporativo ?? '', Telefono: u.Telefono ?? '',
+      FechaNacimiento: u.FechaNacimiento ? String(u.FechaNacimiento).slice(0, 10) : '',
+      Extension: u.Extension ?? '', Direccion: u.Direccion ?? '', Area: u.Area ?? '', Password: '',
       EmpresaIds: String(u.EmpresasIds ?? '').split(',').filter(Boolean),
       AgenciaId: String(u.AgenciaId ?? ''), CargoId: String(u.CargoId ?? ''),
       CargoJefeDirectoId: u.CargoJefeDirectoId ? String(u.CargoJefeDirectoId) : '',
@@ -172,11 +176,11 @@ export const AdminUsersPage = () => {
             <tbody>
               {loading && <tr><td colSpan={8} className="p-6 text-center text-slate-500">Cargando...</td></tr>}
               {!loading && filtered.length === 0 && <tr><td colSpan={8} className="p-6 text-center text-slate-500">Sin resultados.</td></tr>}
-              {filtered.map((u) => (
+              {filtered.slice(0, visible).map((u) => (
                 <tr key={u.Id} className="border-b border-slate-100 hover:bg-slate-50">
                   <td className="p-2 font-medium text-slate-800">{u.Nombres} {u.Apellidos}</td>
                   <td className="p-2">{u.Cedula || '—'}</td>
-                  <td className="p-2">{u.EmailCorporativo}</td>
+                  <td className="p-2">{u.EmailCorporativo || (u.Usuario ? `Usuario: ${u.Usuario}` : '—')}</td>
                   <td className="p-2">{lookup(catalogs.cargos, u.CargoId)}</td>
                   <td className="p-2">{lookup(catalogs.agencias, u.AgenciaId)}</td>
                   <td className="p-2">{u.RolNombre}</td>
@@ -196,6 +200,13 @@ export const AdminUsersPage = () => {
             </tbody>
           </table>
         </div>
+        {filtered.length > visible && (
+          <div className="mt-4 text-center">
+            <button type="button" onClick={() => setVisible((v) => v + 100)} className="rounded-xl border border-slate-300 px-4 py-2 text-sm">
+              Mostrar más ({filtered.length - visible} restantes)
+            </button>
+          </div>
+        )}
       </section>
 
       {form && (
@@ -209,8 +220,13 @@ export const AdminUsersPage = () => {
               <Field label="Nombres"><input required className={inputClass} value={form.Nombres} onChange={(e) => set('Nombres', e.target.value)} /></Field>
               <Field label="Apellidos"><input required className={inputClass} value={form.Apellidos} onChange={(e) => set('Apellidos', e.target.value)} /></Field>
               <Field label="Cédula de ciudadanía"><input className={inputClass} value={form.Cedula} onChange={(e) => set('Cedula', e.target.value)} /></Field>
-              <Field label="Correo corporativo"><input required type="email" className={inputClass} value={form.EmailCorporativo} onChange={(e) => set('EmailCorporativo', e.target.value)} /></Field>
+              <Field label="Correo corporativo (opcional para conductores y taquilleros)"><input type="email" className={inputClass} value={form.EmailCorporativo} onChange={(e) => set('EmailCorporativo', e.target.value)} /></Field>
               <Field label="Teléfono"><input className={inputClass} value={form.Telefono} onChange={(e) => set('Telefono', e.target.value)} /></Field>
+              <Field label="Fecha de nacimiento"><input type="date" className={inputClass} value={form.FechaNacimiento} onChange={(e) => set('FechaNacimiento', e.target.value)} /></Field>
+              <Field label="Extensión"><input className={inputClass} value={form.Extension} onChange={(e) => set('Extension', e.target.value)} /></Field>
+              <Field label="Dirección"><input className={inputClass} value={form.Direccion} onChange={(e) => set('Direccion', e.target.value)} /></Field>
+              <Field label="Área"><input className={inputClass} value={form.Area} onChange={(e) => set('Area', e.target.value)} /></Field>
+              <Field label={editingId ? 'Nueva contraseña (opcional)' : 'Contraseña (opcional)'}><input type="password" minLength={8} autoComplete="new-password" className={inputClass} value={form.Password} onChange={(e) => set('Password', e.target.value)} /></Field>
               <Field label="Agencia">
                 <select required className={inputClass} value={form.AgenciaId} onChange={(e) => set('AgenciaId', e.target.value)}>
                   <option value="">Selecciona...</option>

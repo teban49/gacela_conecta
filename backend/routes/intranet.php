@@ -8,16 +8,6 @@ use App\Controllers\Intranet\OrganigramaPuestoController;
 use App\Controllers\Intranet\ManualController;
 use App\Core\Router;
 
-Router::post('/api/v1/intranet/directorio', function () {
-    $controller = new IntranetController();
-    $controller->createDirectorio();
-}, ['jwt', 'intranet.administrar_directorio']);
-
-Router::delete('/api/v1/intranet/directorio/{id}', function (int $id) {
-    $controller = new IntranetController();
-    $controller->deleteDirectorio($id);
-}, ['jwt', 'intranet.administrar_directorio']);
-
 Router::delete('/api/v1/intranet/noticias/{id}', function (int $id) {
     $controller = new NoticiaController();
     $controller->destroy($id);
@@ -72,11 +62,6 @@ Router::delete('/api/v1/intranet/calidad/empresas/{companyId}/{area}/{filename}'
     $controller = new IntranetController();
     $controller->eliminarCalidadDocumento($companyId, $area, $filename);
 }, ['jwt', 'intranet.ver']);
-
-Router::put('/api/v1/intranet/directorio/{id}', function (int $id) {
-    $controller = new IntranetController();
-    $controller->updateDirectorio($id);
-}, ['jwt', 'intranet.administrar_directorio']);
 
 /*
 |--------------------------------------------------------------------------

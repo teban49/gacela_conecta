@@ -24,7 +24,22 @@ class SolicitudLaboralController
     public function companies(): void
     {
         $user = $this->authenticatedUser();
-        Response::success($this->service->getUserCompanies((int) $user['id']), 'Empresas del usuario obtenidas correctamente.');
+        $targetId = (int) $user['id'];
+        $beneficiaryId = (int) ($_GET['BeneficiarioId'] ?? 0);
+        if ($beneficiaryId > 0 && $beneficiaryId !== $targetId) {
+            if (!(new \App\Repositories\BeneficiaryRepository())->canRequestFor($targetId, $beneficiaryId)) {
+                Response::forbidden('No puedes consultar ese empleado.');
+                return;
+            }
+            $targetId = $beneficiaryId;
+        }
+        Response::success($this->service->getUserCompanies($targetId), 'Empresas del usuario obtenidas correctamente.');
+    }
+
+    public function beneficiaries(): void
+    {
+        $user = $this->authenticatedUser();
+        Response::success($this->service->getBeneficiaries((int) $user['id']), 'Empleados disponibles obtenidos correctamente.');
     }
 
     public function mine(): void

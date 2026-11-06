@@ -96,6 +96,55 @@ class AuthController
     }
 
     /**
+     * POST /api/v1/auth/login
+     * Login con usuario y contraseña (usuarios sin correo corporativo)
+     */
+    public function login(): void
+    {
+        $usuario = (string) $this->request->get('usuario');
+        $password = (string) $this->request->get('password');
+
+        if (trim($usuario) === '' || $password === '') {
+            Response::validationError(['usuario' => 'Usuario y contraseña son requeridos.']);
+            return;
+        }
+
+        $result = $this->authService->loginWithPassword($usuario, $password, $this->request->getIp());
+
+        if ($result['success']) {
+            Response::success($result['data'], $result['message']);
+        } elseif (($result['status'] ?? 0) === 429) {
+            Response::error($result['message'], [], 429);
+        } else {
+            Response::unauthorized($result['message']);
+        }
+    }
+
+    /**
+     * PUT /api/v1/auth/profile
+     * El usuario completa o confirma sus propios datos
+     */
+    public function updateProfile(): void
+    {
+        $token = $this->request->getBearerToken();
+        $session = $token ? $this->authService->validateSessionToken($token) : null;
+
+        if (!$session) {
+            Response::unauthorized('Token inválido o expirado.');
+            return;
+        }
+
+        $result = $this->authService->updateProfile((int) $session['id'], $this->request->getData());
+
+        if (!$result['success']) {
+            Response::error($result['message']);
+            return;
+        }
+
+        Response::success($this->authService->validateSessionToken($token), $result['message']);
+    }
+
+    /**
      * POST /api/v1/auth/logout
      * Logout current user (client-side token removal)
      */

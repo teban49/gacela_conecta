@@ -21,6 +21,16 @@ Router::get('/api/v1/auth/me', function() {
     $controller->me();
 }, ['jwt']);
 
+Router::post('/api/v1/auth/login', function() {
+    $controller = new AuthController();
+    $controller->login();
+});
+
+Router::put('/api/v1/auth/profile', function() {
+    $controller = new AuthController();
+    $controller->updateProfile();
+}, ['jwt']);
+
 Router::post('/api/v1/auth/logout', function() {
     $controller = new AuthController();
     $controller->logout();

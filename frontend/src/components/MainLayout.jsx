@@ -4,6 +4,7 @@ import { Outlet, useLocation } from 'react-router-dom';
 import DashboardHeader from '../modules/dashboard/components/DashboardHeader'; // Importa tu header actual
 import PendingAssetAssignments from '../modules/gestion/components/PendingAssetAssignments';
 import Sidebar from './Sidebar';
+import ProfileGate from './ProfileGate';
 
 export const MainLayout = () => {
   const location = useLocation();
@@ -14,6 +15,7 @@ export const MainLayout = () => {
   return (
     <div className="min-h-screen bg-slate-100 flex flex-col">
       {/* Header reutilizado globalmente */}
+      <ProfileGate />
       <DashboardHeader />
 
       <div className="flex flex-1">

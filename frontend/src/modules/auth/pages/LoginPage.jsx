@@ -9,8 +9,33 @@ const LoginPage = () => {
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
+  const [mode, setMode] = useState('email');
+  const [usuario, setUsuario] = useState('');
+  const [password, setPassword] = useState('');
   const navigate = useNavigate();
   const { login } = useAuth();
+
+  const handlePasswordSubmit = async (e) => {
+    e.preventDefault();
+    setError('');
+    setMessage('');
+    setLoading(true);
+
+    try {
+      const response = await authAPI.login(usuario.trim(), password);
+      if (response.data.success) {
+        const { token, user } = response.data.data;
+        login(token, user);
+        navigate('/dashboard', { replace: true });
+      } else {
+        setError(response.data.message || 'Usuario o contraseña incorrectos.');
+      }
+    } catch (err) {
+      setError(err.response?.data?.message || 'Error de conexión. Por favor intenta nuevamente.');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -48,6 +73,59 @@ const LoginPage = () => {
           </div>
 
           {/* Form */}
+          <div className="mb-6 grid grid-cols-2 rounded-lg bg-gray-100 p-1 text-sm font-medium">
+            {[['email', 'Con correo'], ['usuario', 'Con usuario']].map(([key, label]) => (
+              <button
+                key={key}
+                type="button"
+                onClick={() => { setMode(key); setError(''); setMessage(''); }}
+                className={`rounded-md py-2 transition-colors ${mode === key ? 'bg-white text-indigo-700 shadow' : 'text-gray-600 hover:text-gray-900'}`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+
+          {mode === 'usuario' && (
+            <form onSubmit={handlePasswordSubmit} className="space-y-6">
+              <div>
+                <label htmlFor="usuario" className="block text-sm font-medium text-gray-700 mb-2">Usuario</label>
+                <input
+                  type="text"
+                  id="usuario"
+                  value={usuario}
+                  onChange={(e) => setUsuario(e.target.value)}
+                  placeholder="e.bernal"
+                  autoComplete="username"
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-colors"
+                  required
+                  disabled={loading}
+                />
+              </div>
+              <div>
+                <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-2">Contraseña</label>
+                <input
+                  type="password"
+                  id="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  autoComplete="current-password"
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-colors"
+                  required
+                  disabled={loading}
+                />
+              </div>
+              <button
+                type="submit"
+                disabled={loading || !usuario || !password}
+                className="w-full bg-gradient-to-r from-indigo-500 to-purple-600 text-white py-3 px-4 rounded-lg font-medium hover:from-indigo-600 hover:to-purple-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+              >
+                {loading ? <><Loader2 className="w-5 h-5 animate-spin" /> Ingresando...</> : 'Ingresar'}
+              </button>
+            </form>
+          )}
+
+          {mode === 'email' && (
           <form onSubmit={handleSubmit} className="space-y-6">
             <div>
               <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-2">
@@ -83,6 +161,7 @@ const LoginPage = () => {
               )}
             </button>
           </form>
+          )}
 
           {/* Messages */}
           {message && (

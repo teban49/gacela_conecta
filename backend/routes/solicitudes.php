@@ -103,6 +103,10 @@ Router::get('/api/v1/solicitudes/laborales/empresas', function () {
     (new SolicitudLaboralController())->companies();
 }, ['jwt']);
 
+Router::get('/api/v1/solicitudes/laborales/beneficiarios', function () {
+    (new SolicitudLaboralController())->beneficiaries();
+}, ['jwt']);
+
 Router::get('/api/v1/solicitudes/laborales/mis-solicitudes', function () {
     (new SolicitudLaboralController())->mine();
 }, ['jwt']);

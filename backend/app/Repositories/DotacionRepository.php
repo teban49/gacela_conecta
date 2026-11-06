@@ -61,10 +61,10 @@ class DotacionRepository extends BaseRepository
     public function getMine(int $userId): array
     {
         $stmt = $this->db->prepare($this->selectSql() . '
-            WHERE s.UsuarioId = :UsuarioId
+            WHERE (s.UsuarioId = :UsuarioId OR s.CreadoPorId = :CreadoPorId)
             ORDER BY s.FechaActualizacion DESC, s.Id DESC
         ');
-        $stmt->execute([':UsuarioId' => $userId]);
+        $stmt->execute([':UsuarioId' => $userId, ':CreadoPorId' => $userId]);
 
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
     }
@@ -174,6 +174,7 @@ class DotacionRepository extends BaseRepository
             SELECT COUNT(*) FROM gcp_dotacionsolicitudes s
             WHERE s.Id = :Id AND (
                 s.UsuarioId = :Requester
+                OR s.CreadoPorId = :Creator
                 OR (s.Estado = 'Pendiente_Jefe' AND s.JefeGestionHumanaId = :Jefe)
                 OR s.CoordinadorId = :Coordinador
                 OR EXISTS (
@@ -185,6 +186,7 @@ class DotacionRepository extends BaseRepository
         $stmt->execute([
             ':Id' => $requestId,
             ':Requester' => $userId,
+            ':Creator' => $userId,
             ':Jefe' => $userId,
             ':Coordinador' => $userId,
             ':HistoryUser' => $userId,
@@ -199,12 +201,13 @@ class DotacionRepository extends BaseRepository
         try {
             $stmt = $this->db->prepare("
                 INSERT INTO gcp_dotacionsolicitudes
-                    (UsuarioId, EmpresaId, CedulaExpedidaEn, Estado, NivelActual, JefeGestionHumanaId, CoordinadorId)
+                    (UsuarioId, CreadoPorId, EmpresaId, CedulaExpedidaEn, Estado, NivelActual, JefeGestionHumanaId, CoordinadorId)
                 VALUES
-                    (:UsuarioId, :EmpresaId, :CedulaExpedidaEn, :Estado, :NivelActual, :JefeId, :CoordinadorId)
+                    (:UsuarioId, :CreadoPorId, :EmpresaId, :CedulaExpedidaEn, :Estado, :NivelActual, :JefeId, :CoordinadorId)
             ");
             $stmt->execute([
                 ':UsuarioId' => $data['UsuarioId'],
+                ':CreadoPorId' => $data['CreadoPorId'] ?? null,
                 ':EmpresaId' => $data['EmpresaId'],
                 ':CedulaExpedidaEn' => $data['CedulaExpedidaEn'],
                 ':Estado' => $approvingJefeId ? 'Pendiente_Jefe' : 'Pendiente_Coordinador',
@@ -233,7 +236,7 @@ class DotacionRepository extends BaseRepository
             ");
             $history->execute([
                 ':SolicitudId' => $id,
-                ':UsuarioId' => $data['UsuarioId'],
+                ':UsuarioId' => $data['CreadoPorId'] ?? $data['UsuarioId'],
                 ':Nivel' => $approvingJefeId ? 1 : 2,
             ]);
             $this->db->commit();
@@ -298,7 +301,7 @@ class DotacionRepository extends BaseRepository
 
             return [
                 'Estado' => $nextState,
-                'SolicitanteId' => (int) $request['UsuarioId'],
+                'SolicitanteId' => (int) ($request['CreadoPorId'] ?? $request['UsuarioId']),
                 'NotificarSolicitante' => !$approve || $nextState === 'Aprobada',
             ];
         } catch (\Throwable $e) {
@@ -313,14 +316,14 @@ class DotacionRepository extends BaseRepository
     {
         $this->db->beginTransaction();
         try {
-            $stmt = $this->db->prepare('SELECT UsuarioId, CoordinadorId, Estado FROM gcp_dotacionsolicitudes WHERE Id = :Id FOR UPDATE');
+            $stmt = $this->db->prepare('SELECT UsuarioId, CreadoPorId, CoordinadorId, Estado FROM gcp_dotacionsolicitudes WHERE Id = :Id FOR UPDATE');
             $stmt->execute([':Id' => $requestId]);
             $request = $stmt->fetch(PDO::FETCH_ASSOC);
             if (!$request) {
                 $this->db->commit();
                 return ['error' => 'not_found'];
             }
-            if ((int) $request['UsuarioId'] !== $userId) {
+            if ((int) $request['UsuarioId'] !== $userId && (int) ($request['CreadoPorId'] ?? 0) !== $userId) {
                 $this->db->commit();
                 return ['error' => 'forbidden'];
             }
@@ -468,7 +471,7 @@ class DotacionRepository extends BaseRepository
     private function selectSql(): string
     {
         return "
-            SELECT s.Id, s.UsuarioId, s.EmpresaId, e.Nombre AS EmpresaNombre, e.Codigo AS EmpresaCodigo,
+            SELECT s.Id, s.UsuarioId, s.CreadoPorId, s.EmpresaId, e.Nombre AS EmpresaNombre, e.Codigo AS EmpresaCodigo,
                    s.CedulaExpedidaEn, s.Estado, s.NivelActual, s.JefeGestionHumanaId, s.CoordinadorId,
                    s.FechaCreacion, s.FechaActualizacion,
                    u.Nombres AS SolicitanteNombres, u.Apellidos AS SolicitanteApellidos,

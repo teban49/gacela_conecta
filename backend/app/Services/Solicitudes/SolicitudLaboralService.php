@@ -2,6 +2,7 @@
 
 namespace App\Services\Solicitudes;
 
+use App\Repositories\BeneficiaryRepository;
 use App\Repositories\NotificacionRepository;
 use App\Repositories\Solicitudes\SolicitudLaboralRepository;
 use DateTimeImmutable;
@@ -170,8 +171,23 @@ class SolicitudLaboralService
 
         return $this->repository->getPayrollDocument($requestId, $documentId);
     }
+    public function getBeneficiaries(int $userId): array
+    {
+        return (new BeneficiaryRepository())->getTaquilleros($userId);
+    }
+
     public function create(int $userId, array $data, ?array $attachment): array
     {
+        $creatorId = null;
+        $beneficiaryId = filter_var($data['BeneficiarioId'] ?? null, FILTER_VALIDATE_INT);
+        if ($beneficiaryId !== false && $beneficiaryId !== null && $beneficiaryId !== $userId) {
+            if (!(new BeneficiaryRepository())->canRequestFor($userId, $beneficiaryId)) {
+                return ['success' => false, 'message' => 'No puedes registrar solicitudes para ese empleado.', 'errors' => ['BeneficiarioId' => ['Empleado no permitido.']]];
+            }
+            $creatorId = $userId;
+            $userId = $beneficiaryId;
+        }
+
         $errors = [];
         $typeId = filter_var($data['TipoId'] ?? null, FILTER_VALIDATE_INT);
         $subject = is_string($data['Asunto'] ?? null) ? trim($data['Asunto']) : '';
@@ -259,6 +275,7 @@ class SolicitudLaboralService
 
         $id = $this->repository->create([
             'UsuarioId' => $userId,
+            'CreadoPorId' => $creatorId,
             'AprobadorCargoId' => $managerCargoId,
             'TipoId' => $typeId,
             'Asunto' => $subject,

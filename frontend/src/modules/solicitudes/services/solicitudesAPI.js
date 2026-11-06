@@ -22,7 +22,10 @@ export const solicitudesAPI = {
 
   // HR requests with sequential manager, HR, and management approvals
   getLaboralTypes: () => api.get('/solicitudes/laborales/tipos'),
-  getLaboralCompanies: () => api.get('/solicitudes/laborales/empresas'),
+  getLaboralCompanies: (beneficiarioId) => api.get('/solicitudes/laborales/empresas', {
+    params: beneficiarioId ? { BeneficiarioId: beneficiarioId } : {},
+  }),
+  getLaboralBeneficiaries: () => api.get('/solicitudes/laborales/beneficiarios'),
   getMyLaboralRequests: () => api.get('/solicitudes/laborales/mis-solicitudes'),
   getPendingLaboralRequests: () => api.get('/solicitudes/laborales/pendientes'),
   getLaboralRequest: (id) => api.get(`/solicitudes/laborales/${id}`),
