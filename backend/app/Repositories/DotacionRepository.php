@@ -109,7 +109,7 @@ class DotacionRepository extends BaseRepository
         return $request;
     }
 
-    /** Entregas anteriores (histórico importado y solicitudes recibidas) por cédula. */
+    /** Entregas anteriores (histÃ³rico importado y solicitudes recibidas) por cÃ©dula. */
     public function getDeliveryHistory(string $cedula, int $excludeRequestId): array
     {
         $cedula = preg_replace('/\D+/', '', $cedula);
@@ -146,7 +146,7 @@ class DotacionRepository extends BaseRepository
             INNER JOIN gcp_empresas emp ON emp.Id = s.EmpresaId
             INNER JOIN gcp_dotacionhistorial h ON h.SolicitudId = s.Id AND h.Accion = 'Recibida'
             WHERE s.Estado = 'Recibida' AND s.Id <> :Excluir
-              AND REGEXP_REPLACE(u.Cedula, '[^0-9]', '') = :Cedula
+              AND u.Cedula = :Cedula
             GROUP BY s.Id, emp.Nombre
         ");
         $current->execute([':Excluir' => $excludeRequestId, ':Cedula' => $cedula]);
@@ -344,7 +344,7 @@ class DotacionRepository extends BaseRepository
 
             $this->db->prepare("
                 INSERT INTO entregas_dotacion (empresa_id, solicitud_id, cedula, fecha_entrega)
-                SELECT s.EmpresaId, s.Id, REGEXP_REPLACE(u.Cedula, '[^0-9]', ''), CURDATE()
+                SELECT s.EmpresaId, s.Id, u.Cedula, CURDATE()
                 FROM gcp_dotacionsolicitudes s
                 INNER JOIN gcp_usuarios u ON u.Id = s.UsuarioId
                 WHERE s.Id = :Id
@@ -376,7 +376,7 @@ class DotacionRepository extends BaseRepository
         return (int) $stmt->fetchColumn() > 0;
     }
 
-    /** Entregas de las empresas vinculadas al usuario, de la más nueva a la más antigua. */
+    /** Entregas de las empresas vinculadas al usuario, de la mÃ¡s nueva a la mÃ¡s antigua. */
     public function getDeliveries(int $userId, string $search, int $limit, int $offset): array
     {
         $companies = $this->db->prepare('SELECT EmpresaId FROM gcp_usuariosempresas WHERE UsuarioId = :Id');
@@ -394,7 +394,7 @@ class DotacionRepository extends BaseRepository
             $where[] = 'e.empresa_id IN (' . implode(',', $placeholders) . ')';
         }
         if ($search !== '') {
-            $where[] = "(e.cedula LIKE :Q OR EXISTS (SELECT 1 FROM gcp_usuarios us WHERE REGEXP_REPLACE(us.Cedula, '[^0-9]', '') = e.cedula AND CONCAT_WS(' ', us.Nombres, us.Apellidos) LIKE :Q2))";
+            $where[] = "(e.cedula LIKE :Q OR EXISTS (SELECT 1 FROM gcp_usuarios us WHERE us.Cedula = e.cedula AND CONCAT_WS(' ', us.Nombres, us.Apellidos) LIKE :Q2))";
             $params[':Q'] = '%' . preg_replace('/\D+/', '', $search) . '%';
             $params[':Q2'] = '%' . $search . '%';
             if ($params[':Q'] === '%%') {
@@ -412,7 +412,7 @@ class DotacionRepository extends BaseRepository
 
         $stmt = $this->db->prepare("
             SELECT e.id AS Id, e.fecha_entrega AS Fecha, e.cedula AS Cedula, emp.Nombre AS Empresa,
-                   (SELECT CONCAT_WS(' ', u.Nombres, u.Apellidos) FROM gcp_usuarios u WHERE REGEXP_REPLACE(u.Cedula, '[^0-9]', '') = e.cedula ORDER BY u.Estado DESC, u.Id LIMIT 1) AS Empleado
+                   (SELECT CONCAT_WS(' ', u.Nombres, u.Apellidos) FROM gcp_usuarios u WHERE u.Cedula = e.cedula ORDER BY u.Estado DESC, u.Id LIMIT 1) AS Empleado
             {$base}
             ORDER BY e.fecha_entrega DESC, e.id DESC
             LIMIT {$limit} OFFSET {$offset}
@@ -508,8 +508,8 @@ class DotacionRepository extends BaseRepository
     private function normalize(string $value): string
     {
         return mb_strtolower(strtr($value, [
-            'á' => 'a', 'é' => 'e', 'í' => 'i', 'ó' => 'o', 'ú' => 'u',
-            'Á' => 'A', 'É' => 'E', 'Í' => 'I', 'Ó' => 'O', 'Ú' => 'U',
+            'Ã¡' => 'a', 'Ã©' => 'e', 'Ã­' => 'i', 'Ã³' => 'o', 'Ãº' => 'u',
+            'Ã' => 'A', 'Ã‰' => 'E', 'Ã' => 'I', 'Ã“' => 'O', 'Ãš' => 'U',
         ]));
     }
 }

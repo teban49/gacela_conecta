@@ -1,18 +1,26 @@
 import { createBrowserRouter, Navigate, Outlet } from 'react-router-dom';
 import { LoginPage, VerifyPage } from '../modules/auth';
-import DashboardPage from '../modules/dashboard/pages/DashboardPage';
+import { lazy, Suspense } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import { IntranetHomePage } from '../modules/intranet/pages/IntranetHomePage';
-import DirectoryPage from '../modules/intranet/pages/DirectoryPage';
-import SecurityPage from '../modules/security/pages/SecurityPage';
-import SolicitudesPage from '../modules/solicitudes/pages/SolicitudesPage';
-import GestionPage from '../modules/gestion/pages/GestionPage';
-import DotacionPage from '../modules/dotacion/pages/DotacionPage';
-import HorarioPage from '../modules/horario/pages/HorarioPage';
-import AdminUsersPage from '../modules/admin/pages/AdminUsersPage';
 import PermissionRoute from './PermissionRoute';
 import MainLayout from '../components/MainLayout';
 import { usesExternalGestion, GESTION_EXTERNAL_URL } from '../utils/gestionAccess';
+
+const DashboardPage = lazy(() => import('../modules/dashboard/pages/DashboardPage'));
+const IntranetHomePage = lazy(() => import('../modules/intranet/pages/IntranetHomePage').then((m) => ({ default: m.IntranetHomePage })));
+const DirectoryPage = lazy(() => import('../modules/intranet/pages/DirectoryPage'));
+const SecurityPage = lazy(() => import('../modules/security/pages/SecurityPage'));
+const SolicitudesPage = lazy(() => import('../modules/solicitudes/pages/SolicitudesPage'));
+const GestionPage = lazy(() => import('../modules/gestion/pages/GestionPage'));
+const DotacionPage = lazy(() => import('../modules/dotacion/pages/DotacionPage'));
+const HorarioPage = lazy(() => import('../modules/horario/pages/HorarioPage'));
+const AdminUsersPage = lazy(() => import('../modules/admin/pages/AdminUsersPage'));
+
+const PageFallback = () => (
+  <div className="flex min-h-[40vh] items-center justify-center">
+    <div className="h-10 w-10 animate-spin rounded-full border-b-2 border-orange-600"></div>
+  </div>
+);
 
 const GestionGuard = ({ children }) => {
   const { user } = useAuth();
@@ -65,7 +73,9 @@ const ProtectedLayoutWrapper = () => {
   return (
     <ProtectedRoute>
       <MainLayout user={user}>
-        <Outlet />
+        <Suspense fallback={<PageFallback />}>
+          <Outlet />
+        </Suspense>
       </MainLayout>
     </ProtectedRoute>
   );

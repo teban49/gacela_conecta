@@ -1,4 +1,4 @@
-import dashboardBanner from "../../../assets/images/dashboard-banner.png";
+import dashboardBanner from "../../../assets/images/dashboard-banner.jpg";
 
 const BannerSection = () => {
     return (
