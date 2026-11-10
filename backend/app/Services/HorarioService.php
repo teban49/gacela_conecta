@@ -243,14 +243,20 @@ class HorarioService
         return $value && preg_match('/^\d{4}-\d{2}-\d{2}$/', $value) && strtotime($value) !== false ? $value : null;
     }
 
-    /** Relaciona cada person_id con su área por coincidencia de nombre en el directorio. */
+    /** Relaciona cada person_id con su área por coincidencia de nombre en usuarios activos. */
     private function areaByPerson(): array
     {
-        $directory = [];
-        foreach ($this->db->query('SELECT first_name, last_name, area_agencia FROM directorio_gacela_conecta WHERE area_agencia IS NOT NULL') as $row) {
-            $tokens = $this->tokens(trim($row['first_name'] . ' ' . $row['last_name']));
+        $users = [];
+        $stmt = $this->db->query("
+            SELECT u.Nombres, u.Apellidos, COALESCE(NULLIF(u.Area, ''), a.Nombre) AS area
+            FROM gcp_usuarios u
+            INNER JOIN gcp_agencias a ON a.Id = u.AgenciaId
+            WHERE u.Estado = 1
+        ");
+        foreach ($stmt as $row) {
+            $tokens = $this->tokens(trim($row['Nombres'] . ' ' . $row['Apellidos']));
             if ($tokens) {
-                $directory[] = [$tokens, $row['area_agencia']];
+                $users[] = [$tokens, $row['area']];
             }
         }
 
@@ -259,9 +265,9 @@ class HorarioService
             $tokens = $this->tokens($person['nombre']);
             $best = null;
             $bestScore = 0;
-            foreach ($directory as [$dirTokens, $area]) {
-                $common = count(array_intersect($tokens, $dirTokens));
-                $needed = min(count($tokens), count($dirTokens));
+            foreach ($users as [$userTokens, $area]) {
+                $common = count(array_intersect($tokens, $userTokens));
+                $needed = min(count($tokens), count($userTokens));
                 if ($common >= 2 && $common === $needed && $common > $bestScore) {
                     $best = $area;
                     $bestScore = $common;
