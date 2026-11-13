@@ -6,6 +6,7 @@ use App\Controllers\Intranet\EventoController;
 use App\Controllers\Intranet\IntranetController;
 use App\Controllers\Intranet\OrganigramaPuestoController;
 use App\Controllers\Intranet\ManualController;
+use App\Controllers\Intranet\DocumentLibraryController;
 use App\Core\Router;
 
 Router::delete('/api/v1/intranet/noticias/{id}', function (int $id) {
@@ -26,6 +27,14 @@ Router::post('/api/v1/intranet/manuales/{id}', function (string $id) {
 Router::delete('/api/v1/intranet/manuales/{id}', function (string $id) {
     $controller = new ManualController();
     $controller->destroy($id);
+}, ['jwt', 'intranet.administrar_documentos']);
+
+Router::post('/api/v1/intranet/libraries/{kind}/documents', function (string $kind) {
+    (new DocumentLibraryController())->store($kind);
+}, ['jwt', 'intranet.administrar_documentos']);
+
+Router::delete('/api/v1/intranet/libraries/{kind}/documents', function (string $kind) {
+    (new DocumentLibraryController())->destroy($kind);
 }, ['jwt', 'intranet.administrar_documentos']);
 
 Router::get('/api/v1/intranet/home', function () {

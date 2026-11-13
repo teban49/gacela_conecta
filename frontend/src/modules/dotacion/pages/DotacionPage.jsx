@@ -96,7 +96,7 @@ const DotacionPage = () => {
     const ids = String(beneficiary.EmpresasIds ?? '').split(',');
     return all.filter((company) => ids.includes(String(company.Id)));
   }, [requester.Empresas, beneficiary]);
-  const canCreate = companyOptions.length > 0 || (beneficiary && (requester.Empresas ?? []).length > 0);
+  const canCreate = companyOptions.length > 0;
 
   const changeBeneficiary = (value) => {
     setBeneficiaryId(value);
@@ -224,7 +224,7 @@ const DotacionPage = () => {
           <h2 className="text-xl font-bold text-slate-900">Nueva solicitud</h2>
           <p className="mt-1 text-sm text-slate-600">Flota Magdalena requiere aprobación de Jefe Gestión Humana y Coordinador de Dotación. Rápido Duitama y Expreso Paz de Río pasan directamente al coordinador.</p>
         </div>
-        {!canCreate && <p className="rounded-xl bg-amber-50 p-3 text-sm text-amber-800">Tu usuario no tiene una empresa asignada. Contacta al administrador.</p>}
+        {!canCreate && <p className="rounded-xl bg-amber-50 p-3 text-sm text-amber-800">{beneficiary ? 'No tienes empresas en común con este beneficiario para crear la solicitud.' : 'Tu usuario no tiene una empresa asignada. Contacta al administrador.'}</p>}
         {formError && <p role="alert" className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">{formError}</p>}
 
         <div className="grid gap-4 sm:grid-cols-2">
@@ -246,9 +246,15 @@ const DotacionPage = () => {
             <input readOnly value={beneficiary ? 'Taquillero/a' : (requester.Cargo ?? '')} className="mt-2 w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 font-normal" />
           </label>
           <label className="text-sm font-semibold text-slate-700">Empresa <span className="text-red-600">*</span>
-            <select required value={companyId} onChange={(event) => setCompanyId(event.target.value)} className="mt-2 w-full rounded-xl border border-slate-200 bg-white px-4 py-3">
-              {companyOptions.map((company) => <option key={company.Id} value={company.Id}>{company.Nombre}</option>)}
-            </select>
+            {companyOptions.length > 1 ? (
+              <select required value={companyId} onChange={(event) => setCompanyId(event.target.value)} className="mt-2 w-full rounded-xl border border-slate-200 bg-white px-4 py-3">
+                {companyOptions.map((company) => <option key={company.Id} value={company.Id}>{company.Nombre}</option>)}
+              </select>
+            ) : (
+              <p className={`mt-2 rounded-xl border px-4 py-3 font-normal ${companyOptions.length === 1 ? 'border-slate-200 bg-slate-50' : 'border-amber-200 bg-amber-50 text-amber-800'}`}>
+                {companyOptions[0]?.Nombre ?? 'No hay empresas disponibles para este solicitante.'}
+              </p>
+            )}
           </label>
           <label className="text-sm font-semibold text-slate-700 sm:col-span-2">Lugar de expedición de la cédula <span className="text-red-600">*</span>
             <input required maxLength={120} value={cedulaPlace} onChange={(event) => setCedulaPlace(event.target.value)} placeholder="Ciudad o municipio" className="mt-2 w-full rounded-xl border border-slate-200 px-4 py-3 font-normal" />

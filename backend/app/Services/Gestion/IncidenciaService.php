@@ -5,6 +5,7 @@ namespace App\Services\Gestion;
 use App\Repositories\Gestion\ActivoRepository;
 use App\Repositories\Solicitudes\CategoriaRepository;
 use App\Repositories\Solicitudes\SolicitudRepository;
+use App\Services\Solicitudes\TicketSla;
 use App\Services\Solicitudes\SolicitudService;
 
 class IncidenciaService
@@ -91,6 +92,7 @@ class IncidenciaService
         $data['EmpresaId'] = $companyId;
         $data['Ubicacion'] = $context['Ubicacion'] ?: null;
         $data['Tipo'] = 'incidencia';
+        $data['Prioridad'] = 'baja';
         $data['ArchivoAdjunto'] = $attachment['RutaArchivo'] ?? null;
         $data['ArchivoAdjuntoNombre'] = $attachment['NombreArchivo'] ?? null;
 
@@ -148,6 +150,12 @@ class IncidenciaService
         if ($incident['Estado'] === 'cerrada') {
             return ['success' => false, 'status' => 409, 'message' => 'Una incidencia cerrada no se puede reabrir desde esta pantalla.'];
         }
+        if (isset($updates['Prioridad'])) {
+            $updates['FechaVencimiento'] = TicketSla::deadlineForPriority(
+                $updates['Prioridad'],
+                $incident['FechaCreacion'] ?? null
+            );
+        }
         if (!$this->repository->updateIncidencia($id, $userId, $updates)) {
             return ['success' => false, 'status' => 404, 'message' => 'Incidencia no encontrada.'];
         }
@@ -183,7 +191,7 @@ class IncidenciaService
         }
         $survey['ComentarioSatisfaccion'] = $comment;
         if (!$this->repository->closeIncidenciaByRequester($id, $userId, $survey)) {
-            return ['success' => false, 'status' => 409, 'message' => 'Solo puedes cerrar tu propia incidencia cuando está pendiente.'];
+            return ['success' => false, 'status' => 409, 'message' => 'Solo puedes cerrar tu propia incidencia cuando ya fue solucionada.'];
         }
         return ['success' => true, 'message' => 'Incidencia cerrada. Gracias por responder la encuesta.'];
     }

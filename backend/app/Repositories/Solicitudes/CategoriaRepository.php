@@ -37,6 +37,29 @@ class CategoriaRepository extends BaseRepository
         $stmt = $this->db->prepare($sql);
         $stmt->execute();
 
+        $categories = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        $subcategoriesByCategory = [];
+        foreach ($this->getActiveSubcategories() as $subcategory) {
+            $subcategoriesByCategory[(int) $subcategory['CategoriaId']][] = $subcategory['Nombre'];
+        }
+        foreach ($categories as &$category) {
+            $category['Subcategorias'] = $subcategoriesByCategory[(int) $category['Id']] ?? [];
+        }
+        unset($category);
+        return $categories;
+    }
+
+    public function getActiveSubcategories(?int $categoriaId = null): array
+    {
+        $sql = 'SELECT CategoriaId, Nombre FROM gestion_tickets_subcategorias WHERE Estado = 1';
+        $params = [];
+        if ($categoriaId !== null) {
+            $sql .= ' AND CategoriaId = :CategoriaId';
+            $params[':CategoriaId'] = $categoriaId;
+        }
+        $sql .= ' ORDER BY Nombre ASC';
+        $stmt = $this->db->prepare($sql);
+        $stmt->execute($params);
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
     }
 

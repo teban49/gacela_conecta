@@ -23,7 +23,14 @@ class MantenimientoService
         if ($semester !== 1 && $semester !== 2) {
             return ['success' => false, 'message' => 'Selecciona un semestre válido.'];
         }
-        if (!$this->repository->isEligiblePeriod($assetId, $year, $semester)) {
+        $scheduledDate = $data['FechaProgramada'] ?? null;
+        $parsedDate = is_string($scheduledDate)
+            ? \DateTimeImmutable::createFromFormat('!Y-m-d', $scheduledDate)
+            : false;
+        if (!$parsedDate || $parsedDate->format('Y-m-d') !== $scheduledDate) {
+            return ['success' => false, 'message' => 'La fecha del mantenimiento no es válida.'];
+        }
+        if (!$this->repository->isEligiblePeriod($assetId, $year, $semester, $scheduledDate)) {
             return ['success' => false, 'message' => 'El período no corresponde a un mantenimiento pendiente del activo.'];
         }
 
@@ -40,7 +47,7 @@ class MantenimientoService
             }
         }
 
-        if (!$this->repository->complete($assetId, $year, $semester, $executor, $supplierId, $userId)) {
+        if (!$this->repository->complete($assetId, $year, $semester, $scheduledDate, $executor, $supplierId, $userId)) {
             return ['success' => false, 'message' => 'Este mantenimiento semestral ya fue registrado como completado.'];
         }
         return ['success' => true, 'message' => 'Mantenimiento registrado correctamente.'];

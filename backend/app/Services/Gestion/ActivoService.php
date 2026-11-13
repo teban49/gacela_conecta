@@ -199,8 +199,16 @@ class ActivoService
         ];
     }
 
-    public function assignTo(int $id, int $usuarioId, int $requestedBy): array
+    public function assignTo(int $id, int $usuarioId, int $requestedBy, mixed $observation = null): array
     {
+        if ($observation !== null && !is_string($observation)) {
+            return ['success' => false, 'message' => 'La observación debe ser texto.'];
+        }
+        $observation = is_string($observation) ? trim($observation) : '';
+        if (mb_strlen($observation) > 5000) {
+            return ['success' => false, 'message' => 'La observación no puede superar 5000 caracteres.'];
+        }
+
         $activo = $this->repository->findById($id);
 
         if (!$activo) {
@@ -224,7 +232,12 @@ class ActivoService
             ];
         }
 
-        if (!$this->repository->requestAssignment($id, $usuarioId, $requestedBy)) {
+        if (!$this->repository->requestAssignment(
+            $id,
+            $usuarioId,
+            $requestedBy,
+            $observation === '' ? null : $observation
+        )) {
             return [
                 'success' => false,
                 'message' => 'El activo ya tiene una asignación o solicitud pendiente.'

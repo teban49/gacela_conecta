@@ -34,17 +34,18 @@ const TopList = ({ title, subtitle, items, valueKey, tone }) => (
   </Card>
 );
 
-const PersonTab = ({ rows, areas }) => {
+const PersonTab = ({ rows, areas, areaLimit = null }) => {
   const [area, setArea] = useState('');
   const [pid, setPid] = useState('');
+  const activeArea = areaLimit ?? area;
 
   const people = useMemo(() => byPerson(rows), [rows]);
-  const peopleInArea = useMemo(() => people.filter((person) => !area || person.area === area), [people, area]);
+  const peopleInArea = useMemo(() => people.filter((person) => !activeArea || person.area === activeArea), [people, activeArea]);
   const selected = peopleInArea.find((person) => person.pid === pid) ?? null;
 
   const scopedRows = useMemo(
-    () => rows.filter((row) => (!area || row.area === area) && (!selected || row.pid === selected.pid)),
-    [rows, area, selected]
+    () => rows.filter((row) => (!activeArea || row.area === activeArea) && (!selected || row.pid === selected.pid)),
+    [rows, activeArea, selected]
   );
   const totals = useMemo(() => totalsOf(scopedRows), [scopedRows]);
   const weekdays = useMemo(() => byWeekday(scopedRows), [scopedRows]);
@@ -57,8 +58,8 @@ const PersonTab = ({ rows, areas }) => {
       <Card>
         <div className="grid gap-3 sm:grid-cols-2">
           <label className="text-sm font-medium text-slate-600">Área
-            <select className={`${select} mt-1 w-full`} value={area} onChange={(e) => { setArea(e.target.value); setPid(''); }}>
-              <option value="">Todas las áreas</option>
+            <select className={`${select} mt-1 w-full`} value={activeArea} disabled={Boolean(areaLimit)} onChange={(e) => { setArea(e.target.value); setPid(''); }}>
+              {!areaLimit && <option value="">Todas las áreas</option>}
               {areas.map((item) => <option key={item} value={item}>{item}</option>)}
             </select>
           </label>
@@ -83,7 +84,7 @@ const PersonTab = ({ rows, areas }) => {
 
           <div className="grid gap-6 lg:grid-cols-2">
             <WeekdayChart data={weekdays} />
-            <Card title="Detalle de minutos" subtitle={selected ? selected.nombre : area || 'Todo el personal'}>
+            <Card title="Detalle de minutos" subtitle={selected ? selected.nombre : activeArea || 'Todo el personal'}>
               <div className="h-72">
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart data={[
@@ -96,7 +97,7 @@ const PersonTab = ({ rows, areas }) => {
                     <XAxis dataKey="concepto" interval={0} tick={{ fontSize: 12 }} />
                     <YAxis />
                     <Tooltip formatter={(value) => `${value} min`} />
-                    <Bar dataKey="minutos" name="Minutos" radius={[6, 6, 0, 0]} shape={(props) => <rect {...props} fill={props.payload.fill} rx={6} />} />
+                    <Bar dataKey="minutos" name="Minutos" radius={[6, 6, 0, 0]} shape={(props) => <rect {...props} fill={props.payload.fill} rx={6} />} animationDuration={1000} />
                   </BarChart>
                 </ResponsiveContainer>
               </div>
@@ -120,13 +121,14 @@ const PersonTab = ({ rows, areas }) => {
                     <YAxis />
                     <Tooltip formatter={(value) => `${value} min`} />
                     <Legend verticalAlign="top" />
-                    <Bar dataKey="favor" name="A favor" fill={COLORS.favor} radius={[4, 4, 0, 0]} />
-                    <Bar dataKey="contra" name="En contra" fill={COLORS.contra} radius={[4, 4, 0, 0]} />
+                    <Bar dataKey="favor" name="A favor" fill={COLORS.favor} radius={[4, 4, 0, 0]} animationDuration={1000} />
+                    <Bar dataKey="contra" name="En contra" fill={COLORS.contra} radius={[4, 4, 0, 0]} animationDuration={1000} />
                   </BarChart>
                 </ResponsiveContainer>
               </div>
               <div className="mt-4">
                 <Table
+                  fileName="cumplimiento_por_persona"
                   rows={ranking.map((person) => ({ ...person, key: person.pid }))}
                   columns={[
                     { key: 'nombre', label: 'Persona', render: (row) => <button type="button" className="text-left font-medium text-sky-700 hover:underline" onClick={() => { setArea(row.area === 'Sin área' ? '' : row.area); setPid(row.pid); }}>{row.nombre}</button> },
@@ -143,6 +145,7 @@ const PersonTab = ({ rows, areas }) => {
           ) : (
             <Card title={`Detalle diario de ${selected.nombre}`}>
               <Table
+                fileName="detalle_diario_persona"
                 rows={scopedRows.map((row) => ({ ...row, key: row.fecha }))}
                 columns={[
                   { key: 'fecha', label: 'Fecha', render: (row) => `${formatDate(row.fecha)} · ${WEEKDAYS[row.dow - 1].slice(0, 3)}` },

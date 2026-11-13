@@ -1,12 +1,14 @@
 import React, { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
-import { Newspaper, FileText, Network, BookOpen, Video, ExternalLink, Plus, Search, Filter, Upload, Download, History, X, Building2, Layers, Users, Trash2, HelpCircle, Cake } from 'lucide-react';
+import { Newspaper, FileText, Network, BookOpen, Video, ExternalLink, Plus, Search, Filter, Upload, Download, History, X, Building2, Layers, Users, Trash2, HelpCircle, Cake, Eye } from 'lucide-react';
 import NewsFeed from '../components/NewsFeed';
 import FaqSection from '../components/FaqSection';
 import OrganigramaSection from '../components/OrganigramaSection';
 import { intranetAPI } from '../../../services/intranetAPI';
 import DirectoryPage from './DirectoryPage';
+import DocumentLibraryPage from './DocumentLibraryPage';
 import BirthdaysSection from '../components/BirthdaysSection';
+import PdfViewerModal from '../components/PdfViewerModal';
 import { useAuth } from '../../../contexts/AuthContext';
 import { canViewQualityArea } from '../../../utils/roleAccess';
 
@@ -38,6 +40,7 @@ const mediaPaths = {
 };
 const routeTabs = {
   calidad: 'calidad',
+  formatos: 'formatos',
   documentacion: 'documentacion',
   directorio: 'directorio',
   cumpleanos: 'cumpleanos',
@@ -61,7 +64,7 @@ const loadMediaCatalog = async (path) => {
 export const IntranetHomePage = () => {
   const { tab } = useParams();
   const { hasPermission, hasRole, user } = useAuth();
-  const canManageDocuments = hasPermission('intranet.administrar_documentos');
+  const canManageDocuments = hasRole('admin') && hasPermission('intranet.administrar_documentos');
   const canManageNews = hasPermission('intranet.administrar_noticias');
   const canManageQuality = hasRole('admin');
   const [activeTab, setActiveTab] = useState(() => routeTabs[tab?.toLowerCase()] ?? 'noticias');
@@ -73,6 +76,7 @@ export const IntranetHomePage = () => {
   const [qualityUploadCategory, setQualityUploadCategory] = useState(qualityCategories[0].id);
   const [qualityUploadFile, setQualityUploadFile] = useState(null);
   const [qualityUploading, setQualityUploading] = useState(false);
+  const [qualityUploadOpen, setQualityUploadOpen] = useState(false);
   const [qualityMessage, setQualityMessage] = useState('');
   const [qualityReload, setQualityReload] = useState(0);
   const [noticiaImage, setNoticiaImage] = useState(null);
@@ -80,6 +84,7 @@ export const IntranetHomePage = () => {
   const [qualityDocuments, setQualityDocuments] = useState([]);
   const [qualityDocumentsLoading, setQualityDocumentsLoading] = useState(false);
   const [qualityDocumentsError, setQualityDocumentsError] = useState('');
+  const [pdfViewer, setPdfViewer] = useState(null);
   const [loading, setLoading] = useState(true);
   const [mediaCatalog, setMediaCatalog] = useState({ pildoras: {}, manuales: [], links: [] });
   const [mediaError, setMediaError] = useState('');
@@ -141,12 +146,6 @@ export const IntranetHomePage = () => {
   }, []);
 
   useEffect(() => {
-    if (activeTab === 'documentacion') {
-      fetchDocumentos();
-    }
-  }, [activeTab, selectedEmpresa, selectedArea, selectedCategoria, searchTerm]);
-
-  useEffect(() => {
     const companies = user?.organization?.Empresas ?? [];
     if (companies.length === 1) {
       setSelectedQualityCompany(String(companies[0].Id));
@@ -160,6 +159,10 @@ export const IntranetHomePage = () => {
     const firstArea = qualityAreas.find((area) => canViewQualityArea(user, area.id));
     if (firstArea) setSelectedQualityArea(firstArea.id);
   }, [selectedQualityCompany, selectedQualityArea, user]);
+
+  useEffect(() => () => {
+    if (pdfViewer?.url?.startsWith('blob:')) URL.revokeObjectURL(pdfViewer.url);
+  }, [pdfViewer]);
 
   useEffect(() => {
     if (activeTab !== 'calidad' || !selectedQualityCompany) {
@@ -327,24 +330,18 @@ export const IntranetHomePage = () => {
     }
   };
 
-  const handleDownloadQualityDocument = async (document) => {
+  const handleViewQualityDocument = async (document) => {
     try {
-      const response = await intranetAPI.descargarCalidadDocumento(
+      const response = await intranetAPI.verCalidadDocumento(
         selectedQualityCompany,
         document.area,
         document.archivo,
         document.categoria,
       );
-      const downloadUrl = URL.createObjectURL(response.data);
-      const anchor = window.document.createElement('a');
-      anchor.href = downloadUrl;
-      anchor.download = document.archivo;
-      window.document.body.appendChild(anchor);
-      anchor.click();
-      anchor.remove();
-      window.setTimeout(() => URL.revokeObjectURL(downloadUrl), 1000);
+      const url = URL.createObjectURL(response.data);
+      setPdfViewer({ title: document.titulo, url });
     } catch (error) {
-      setQualityDocumentsError(error.response?.data?.message || 'No fue posible descargar el documento.');
+      setQualityDocumentsError(error.response?.data?.message || 'No fue posible abrir el documento.');
     }
   };
 
@@ -363,6 +360,7 @@ export const IntranetHomePage = () => {
       );
       setQualityMessage(response.data?.message || 'Documento cargado correctamente.');
       setQualityUploadFile(null);
+      setQualityUploadOpen(false);
       event.target.reset();
       setQualityReload((value) => value + 1);
     } catch (error) {
@@ -418,10 +416,15 @@ export const IntranetHomePage = () => {
   };
 
   const deleteManual = async (manual) => {
-    if (!window.confirm(`¿Eliminar el manual "${manual.titulo}"?`)) return;
+    if (!window.confirm(`¿Borrar el manual "${manual.titulo}"?`)) return;
     try {
-      await intranetAPI.deleteManual(manual.jsonId);
-      setManualReload((value) => value + 1);
+      if (manual.dbId) {
+        await intranetAPI.changeDocumentoStatus(manual.dbId, 'inactivo');
+        await fetchInitialData();
+      } else {
+        await intranetAPI.deleteManual(manual.jsonId);
+        setManualReload((value) => value + 1);
+      }
     } catch (error) {
       setMediaError(error.response?.data?.message || 'No fue posible eliminar el manual.');
     }
@@ -444,6 +447,7 @@ export const IntranetHomePage = () => {
       tipo: manual.CategoriaNombre || manual.Tipo,
       version: manual.Version,
       url: manual.RutaArchivo,
+      dbId: manual.Id,
     })),
     ...mediaCatalog.manuales.map((manual, index) => ({
       id: `pdf-${manual.id ?? index}`,
@@ -490,6 +494,8 @@ export const IntranetHomePage = () => {
           {[
             { id: 'noticias', label: 'Noticias & Comunicados', icon: Newspaper },
             { id: 'calidad', label: 'Gestión de Calidad', icon: FileText },
+            { id: 'formatos', label: 'Formatos', icon: FileText },
+            { id: 'documentacion', label: 'Documentación', icon: BookOpen },
             { id: 'directorio', label: 'Directorio', icon: Users },
             { id: 'cumpleanos', label: 'Cumpleaños', icon: Cake },
             { id: 'organigrama', label: 'Organigrama Corporativo', icon: Network },
@@ -598,39 +604,19 @@ export const IntranetHomePage = () => {
                 </div>
               )}
               {selectedQualityArea && canManageQuality && (
-                <form onSubmit={handleUploadQualityDocument} className="flex flex-wrap items-end gap-3 rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
-                  <div>
-                    <label htmlFor="quality-upload-category" className="mb-1 block text-xs font-semibold text-slate-500">Categoría</label>
-                    <select
-                      id="quality-upload-category"
-                      value={qualityUploadCategory}
-                      onChange={(event) => setQualityUploadCategory(event.target.value)}
-                      className="rounded-xl border border-slate-300 px-3 py-2.5 text-sm"
-                    >
-                      {qualityCategories.map((category) => (
-                        <option key={category.id} value={category.id}>{category.label}</option>
-                      ))}
-                    </select>
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <label htmlFor="quality-upload-file" className="mb-1 block text-xs font-semibold text-slate-500">Documento PDF (máx. 20 MB)</label>
-                    <input
-                      id="quality-upload-file"
-                      type="file"
-                      accept="application/pdf,.pdf"
-                      onChange={(event) => setQualityUploadFile(event.target.files?.[0] ?? null)}
-                      className="w-full rounded-xl border border-slate-300 p-2 text-sm"
-                    />
-                  </div>
+                <div>
                   <button
-                    type="submit"
-                    disabled={!qualityUploadFile || qualityUploading}
-                    className="inline-flex items-center gap-2 rounded-xl bg-orange-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-orange-700 disabled:opacity-50"
+                    type="button"
+                    onClick={() => {
+                      setQualityUploadFile(null);
+                      setQualityDocumentsError('');
+                      setQualityUploadOpen(true);
+                    }}
+                    className="inline-flex items-center gap-2 rounded-xl bg-orange-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-orange-700"
                   >
-                    <Upload size={16} />
-                    {qualityUploading ? 'Subiendo...' : 'Subir documento'}
+                    <Plus size={16} /> Nuevo
                   </button>
-                </form>
+                </div>
               )}
               {selectedQualityArea && (
                 <div className="flex flex-wrap gap-2">
@@ -671,20 +657,19 @@ export const IntranetHomePage = () => {
                         <div className="flex shrink-0 items-center gap-2">
                           <button
                             type="button"
-                            onClick={() => handleDownloadQualityDocument(document)}
+                            onClick={() => handleViewQualityDocument(document)}
                             className="inline-flex items-center gap-2 rounded-xl bg-slate-900 px-4 py-2.5 text-xs font-semibold text-white hover:bg-slate-800"
                           >
-                            <Download size={14} />
-                            Descargar
+                            <Eye size={14} /> Ver
                           </button>
                           {canManageQuality && (
                             <button
                               type="button"
                               onClick={() => handleDeleteQualityDocument(document)}
                               aria-label={`Eliminar ${document.titulo}`}
-                              className="inline-flex items-center rounded-xl border border-red-200 p-2.5 text-red-700 hover:bg-red-50"
+                              className="inline-flex items-center gap-2 rounded-xl border border-red-200 px-3 py-2.5 text-xs font-semibold text-red-700 hover:bg-red-50"
                             >
-                              <Trash2 size={14} />
+                              <Trash2 size={14} /> Borrar
                             </button>
                           )}
                         </div>
@@ -707,7 +692,7 @@ export const IntranetHomePage = () => {
         </section>
       )}
 
-      {activeTab === 'documentacion' && (
+      {activeTab === 'documentos-registros' && (
         <div className="space-y-6">
           {/* Filters Bar */}
           <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm space-y-4">
@@ -919,6 +904,9 @@ export const IntranetHomePage = () => {
         </section>
       )}
 
+      {activeTab === 'formatos' && <DocumentLibraryPage kind="formatos" />}
+      {activeTab === 'documentacion' && <DocumentLibraryPage kind="documentacion" />}
+
       {/* Tab: Manuales */}
       {activeTab === 'manuales' && (
         <section className="space-y-4">
@@ -940,7 +928,7 @@ export const IntranetHomePage = () => {
           </div>
           {canManageDocuments && (
             <button type="button" onClick={() => openManualModal()} className="inline-flex items-center gap-2 rounded-xl bg-orange-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-orange-700">
-              <Plus size={16} /> Nuevo manual
+              <Plus size={16} /> Nuevo
             </button>
           )}
           {mediaError && (
@@ -957,13 +945,21 @@ export const IntranetHomePage = () => {
                 {manual.version && <p className="text-xs text-slate-400">Versión: {manual.version}</p>}
               </div>
               <div className="flex flex-col items-end gap-2">
-                <a href={manual.url} target="_blank" rel="noreferrer" className="rounded-xl bg-slate-900 px-4 py-2 text-xs font-semibold text-white hover:bg-slate-800">
-                  Ver Manual
-                </a>
-                {canManageDocuments && manual.jsonId && (
-                  <div className="flex gap-2">
-                    <button type="button" onClick={() => deleteManual(manual)} className="rounded-lg bg-red-50 px-3 py-1.5 text-xs font-semibold text-red-700 hover:bg-red-100">Eliminar</button>
-                  </div>
+                <button
+                  type="button"
+                  onClick={() => setPdfViewer({ title: manual.titulo, url: manual.url })}
+                  className="inline-flex items-center gap-2 rounded-xl bg-slate-900 px-4 py-2 text-xs font-semibold text-white hover:bg-slate-800"
+                >
+                  <Eye size={14} /> Ver
+                </button>
+                {canManageDocuments && (manual.jsonId || manual.dbId) && (
+                  <button
+                    type="button"
+                    onClick={() => deleteManual(manual)}
+                    className="inline-flex items-center gap-2 rounded-xl border border-red-200 px-3 py-1.5 text-xs font-semibold text-red-700 hover:bg-red-50"
+                  >
+                    <Trash2 size={14} /> Borrar
+                  </button>
                 )}
               </div>
             </div>
@@ -1143,6 +1139,58 @@ export const IntranetHomePage = () => {
           </div>
         </div>
       )}
+      {qualityUploadOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" role="presentation">
+          <form
+            onSubmit={handleUploadQualityDocument}
+            className="w-full max-w-lg space-y-4 rounded-3xl bg-white p-6 shadow-xl"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="quality-upload-title"
+          >
+            <div className="flex items-center justify-between gap-4">
+              <h3 id="quality-upload-title" className="text-xl font-bold text-slate-900">Nuevo documento de Calidad</h3>
+              <button type="button" onClick={() => setQualityUploadOpen(false)} aria-label="Cerrar" className="rounded-lg p-2 text-slate-500 hover:bg-slate-100">
+                <X size={18} />
+              </button>
+            </div>
+            {qualityDocumentsError && (
+              <p role="alert" className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+                {qualityDocumentsError}
+              </p>
+            )}
+            <label className="block text-sm font-medium text-slate-700">
+              Categoría
+              <select
+                value={qualityUploadCategory}
+                onChange={(event) => setQualityUploadCategory(event.target.value)}
+                className="mt-1 w-full rounded-xl border border-slate-300 px-3 py-2.5"
+              >
+                {qualityCategories.map((category) => (
+                  <option key={category.id} value={category.id}>{category.label}</option>
+                ))}
+              </select>
+            </label>
+            <label className="block text-sm font-medium text-slate-700">
+              Archivo PDF (máx. 20 MB)
+              <input
+                required
+                type="file"
+                accept="application/pdf,.pdf"
+                onChange={(event) => setQualityUploadFile(event.target.files?.[0] ?? null)}
+                className="mt-1 w-full rounded-xl border border-slate-300 p-2 text-sm"
+              />
+            </label>
+            <div className="flex justify-end gap-2">
+              <button type="button" onClick={() => setQualityUploadOpen(false)} className="rounded-xl px-4 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-100">Cancelar</button>
+              <button type="submit" disabled={!qualityUploadFile || qualityUploading} className="inline-flex items-center gap-2 rounded-xl bg-orange-600 px-4 py-2 text-sm font-semibold text-white hover:bg-orange-700 disabled:opacity-50">
+                <Upload size={15} /> {qualityUploading ? 'Subiendo...' : 'Guardar'}
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
+      <PdfViewerModal title={pdfViewer?.title} url={pdfViewer?.url} onClose={() => setPdfViewer(null)} />
     </div>
   );
 };

@@ -16,20 +16,39 @@ class ActivoRepository extends BaseRepository
                    c.Nombre AS CategoriaNombre, c.Color AS CategoriaColor,
                    e.Nombre AS EmpresaNombre, p.Nombre AS ProveedorNombre,
                    u.Nombres AS AsignadoNombre, u.Apellidos AS AsignadoApellidos,
+                   agencia.Nombre AS AgenciaAsignadoNombre, ciudad.Nombre AS CiudadAsignadoNombre,
+                   CONCAT_WS(', ', NULLIF(agencia.Nombre, ''), NULLIF(ciudad.Nombre, '')) AS UbicacionAsignado,
+                   ultima_asignacion.AsignadoPorNombre, ultima_asignacion.AsignadoPorApellidos,
                    pending.UsuarioId AS UsuarioAsignacionPendienteId,
                    pending.Nombres AS UsuarioAsignacionPendienteNombre,
-                   pending.Apellidos AS UsuarioAsignacionPendienteApellidos
+                   pending.Apellidos AS UsuarioAsignacionPendienteApellidos,
+                   ultima_asignacion.Observacion AS ObservacionAsignacion
             FROM {$this->table} a
             LEFT JOIN gestion_activos_categorias c ON c.Id = a.CategoriaId
             LEFT JOIN gcp_empresas e ON e.Id = a.EmpresaId
             LEFT JOIN gestion_proveedores p ON p.Id = a.ProveedorId
             LEFT JOIN gcp_usuarios u ON u.Id = a.AsignadoA
+            LEFT JOIN gcp_agencias agencia ON agencia.Id = u.AgenciaId
+            LEFT JOIN gcp_ciudades ciudad ON ciudad.Id = agencia.CiudadId
             LEFT JOIN (
                 SELECT aa.ActivoId, aa.UsuarioId, usr.Nombres, usr.Apellidos
                 FROM gestion_activos_asignaciones aa
                 INNER JOIN gcp_usuarios usr ON usr.Id = aa.UsuarioId
                 WHERE aa.Estado = 'pendiente'
             ) pending ON pending.ActivoId = a.Id
+            LEFT JOIN (
+                SELECT asignacion.ActivoId, asignacion.Observacion,
+                       asignador.Nombres AS AsignadoPorNombre,
+                       asignador.Apellidos AS AsignadoPorApellidos
+                FROM gestion_activos_asignaciones asignacion
+                INNER JOIN (
+                    SELECT ActivoId, MAX(Id) AS Id
+                    FROM gestion_activos_asignaciones
+                    WHERE Estado = 'aceptada'
+                    GROUP BY ActivoId
+                ) ultima ON ultima.Id = asignacion.Id
+                LEFT JOIN gcp_usuarios asignador ON asignador.Id = asignacion.AsignadoPorUsuarioId
+            ) ultima_asignacion ON ultima_asignacion.ActivoId = a.Id
             ORDER BY a.FechaCreacion DESC
         ";
 
@@ -125,7 +144,7 @@ class ActivoRepository extends BaseRepository
     public function getPendingAssignmentsForUser(int $usuarioId): array
     {
         $stmt = $this->db->prepare("
-            SELECT aa.Id AS AsignacionId, aa.ActivoId, aa.FechaSolicitud,
+            SELECT aa.Id AS AsignacionId, aa.ActivoId, aa.FechaSolicitud, aa.Observacion,
                    a.CodigoInventario, a.Placa, c.Nombre AS TipoActivo,
                    asignador.Nombres AS SolicitadoPorNombre,
                    asignador.Apellidos AS SolicitadoPorApellidos
@@ -313,7 +332,7 @@ class ActivoRepository extends BaseRepository
         ]);
     }
 
-    public function requestAssignment(int $id, int $usuarioId, int $requestedBy): bool
+    public function requestAssignment(int $id, int $usuarioId, int $requestedBy, ?string $observation): bool
     {
         $this->db->beginTransaction();
         try {
@@ -337,13 +356,15 @@ class ActivoRepository extends BaseRepository
             }
 
             $stmt = $this->db->prepare("
-                INSERT INTO gestion_activos_asignaciones (ActivoId, UsuarioId, AsignadoPorUsuarioId)
-                VALUES (:ActivoId, :UsuarioId, :AsignadoPorUsuarioId)
+                INSERT INTO gestion_activos_asignaciones
+                    (ActivoId, UsuarioId, AsignadoPorUsuarioId, Observacion)
+                VALUES (:ActivoId, :UsuarioId, :AsignadoPorUsuarioId, :Observacion)
             ");
             $stmt->execute([
                 ':ActivoId' => $id,
                 ':UsuarioId' => $usuarioId,
                 ':AsignadoPorUsuarioId' => $requestedBy,
+                ':Observacion' => $observation,
             ]);
             $this->db->commit();
             return true;

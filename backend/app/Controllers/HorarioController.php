@@ -23,7 +23,11 @@ class HorarioController
             return;
         }
 
-        $report = (new HorarioService())->report($_GET['desde'] ?? null, $_GET['hasta'] ?? null);
+        $service = new HorarioService();
+        $roleCodes = RoleAccess::roleCodes($user);
+        $visiblePersonIds = $service->visibleAttendancePersonIds($userId, $roleCodes);
+        $areaLimit = $service->areaLimitForUser($userId, $roleCodes);
+        $report = $service->report($_GET['desde'] ?? null, $_GET['hasta'] ?? null, $visiblePersonIds, $areaLimit);
         Response::success($report, 'Informe de horario obtenido correctamente.');
     }
 

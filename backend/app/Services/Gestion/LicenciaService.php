@@ -58,11 +58,11 @@ class LicenciaService
             $errors['Tipo'] = ['Selecciona un tipo de licencia válido.'];
         }
 
-        $assetIds = $data['ActivosIds'] ?? null;
-        if (!is_array($assetIds) || !$assetIds) {
-            $errors['ActivosIds'] = ['Selecciona al menos un activo asociado.'];
+        $assetIds = $data['ActivosIds'] ?? [];
+        if (!is_array($assetIds)) {
+            $errors['ActivosIds'] = ['La selección de activos no es válida.'];
             $assetIds = [];
-        } else {
+        } elseif ($assetIds) {
             $parsedIds = [];
             foreach ($assetIds as $assetId) {
                 if (!is_int($assetId) && !is_string($assetId)) {

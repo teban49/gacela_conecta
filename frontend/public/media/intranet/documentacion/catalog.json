@@ -1,0 +1,17 @@
+{
+  "Flota": {
+    "documentos": [
+      { "titulo": "DIR-009 POLITICA PARA EL TRANSPORTE DE PASAJEROS", "archivo": "DIR-009 POLITICA PARA EL TRANSPORTE DE PASAJEROS.pdf" },
+      { "titulo": "DIR-014 REGLAMENTO INTERNO DE TRABAJO", "archivo": "DIR-014 REGLAMENTO INTERNO DE TRABAJO.pdf" },
+      { "titulo": "DIR-016 POLITICA TRANSPORTE MENOR DE EDAD", "archivo": "DIR-016 POLITICA TRANSPORTE MENOR DE EDAD.pdf" },
+      { "titulo": "INS-001 GUIA PARA EL PROCESO DE ENCOMIENDAS", "archivo": "INS-001 GUIA PARA EL PROCESO DE ENCOMIENDAS.pdf" },
+      { "titulo": "politica mascotas", "archivo": "politica mascotas.pdf" },
+      { "titulo": "Politicas de Equipaje", "archivo": "Politicas de Equipaje.pdf" },
+      { "titulo": "PRO-001 PROCEDIMIENTO PARA EL TRANSPORTE DE PASAJEROS", "archivo": "PRO-001 PROCEDIMIENTO PARA EL TRANSPORTE DE PASAJEROS.pdf" },
+      { "titulo": "PRO-007 PROCEDIMIENTO DE VENTA ONLINE", "archivo": "PRO-007 PROCEDIMIENTO DE VENTA ONLINE.pdf" },
+      { "titulo": "PROTOCOLO TESORERIA", "archivo": "PROTOCOLO TESORERIA.pdf" }
+    ]
+  },
+  "PDR": { "documentos": [] },
+  "RD": { "documentos": [] }
+}

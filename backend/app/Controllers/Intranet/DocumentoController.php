@@ -2,8 +2,10 @@
 
 namespace App\Controllers\Intranet;
 
+use App\Core\Auth;
 use App\Core\Request;
 use App\Core\Response;
+use App\Core\RoleAccess;
 use App\Services\Intranet\DocumentoService;
 
 class DocumentoController
@@ -50,6 +52,7 @@ class DocumentoController
 
     public function store(): void
     {
+        $this->authorizeAdmin();
         $data = Request::json();
         $result = $this->service->create($data);
 
@@ -62,6 +65,7 @@ class DocumentoController
 
     public function update(int $id): void
     {
+        $this->authorizeAdmin();
         $data = Request::json();
         $result = $this->service->update($id, $data);
 
@@ -74,6 +78,7 @@ class DocumentoController
 
     public function changeStatus(int $id): void
     {
+        $this->authorizeAdmin();
         $data = Request::json();
         $status = $data['Estado'] ?? 'activo';
         $result = $this->service->changeStatus($id, $status);
@@ -82,6 +87,13 @@ class DocumentoController
             Response::success($result['data'] ?? null, $result['message']);
         } else {
             Response::error($result['message']);
+        }
+    }
+
+    private function authorizeAdmin(): void
+    {
+        if (!RoleAccess::isAdmin(Auth::user())) {
+            Response::forbidden('Solo un administrador puede gestionar los documentos.');
         }
     }
 }

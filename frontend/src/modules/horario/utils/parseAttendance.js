@@ -2,7 +2,12 @@ import { unzipSync, strFromU8 } from 'fflate';
 
 const decodeXml = (text) => text
   .replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&apos;/g, "'")
-  .replace(/&#(\d+);/g, (_, code) => String.fromCharCode(Number(code)))
+  .replace(/&#(x[0-9a-f]+|\d+);/gi, (_, code) => {
+    const codePoint = code[0].toLowerCase() === 'x' ? Number.parseInt(code.slice(1), 16) : Number(code);
+    return codePoint <= 0x10ffff && !(codePoint >= 0xd800 && codePoint <= 0xdfff)
+      ? String.fromCodePoint(codePoint)
+      : `&#${code};`;
+  })
   .replace(/&amp;/g, '&');
 
 const textOf = (xml) => {
@@ -28,13 +33,103 @@ const parseTime = (raw) => {
   return null;
 };
 
+const normalizeHeader = (value) => String(value ?? '').replace(/^\uFEFF/, '').trim().toLowerCase();
+const ATTENDANCE_CHECK_POINT = 'Asistencia_Puerta1_Lector de tarjetas de entrada1';
+
+const parseDelimitedRows = (text, delimiter) => {
+  const rows = [];
+  let row = [];
+  let value = '';
+  let quoted = false;
+  for (let i = 0; i < text.length; i += 1) {
+    const character = text[i];
+    if (character === '"') {
+      if (quoted && text[i + 1] === '"') {
+        value += '"';
+        i += 1;
+      } else {
+        quoted = !quoted;
+      }
+    } else if (character === delimiter && !quoted) {
+      row.push(value);
+      value = '';
+    } else if ((character === '\n' || character === '\r') && !quoted) {
+      if (character === '\r' && text[i + 1] === '\n') i += 1;
+      row.push(value);
+      if (row.some((cell) => cell.trim() !== '')) rows.push(row);
+      row = [];
+      value = '';
+    } else {
+      value += character;
+    }
+  }
+  if (value !== '' || row.length) {
+    row.push(value);
+    if (row.some((cell) => cell.trim() !== '')) rows.push(row);
+  }
+  return rows;
+};
+
+const parseAttendanceRows = (rows, getValue) => {
+  if (!rows.length) throw new Error('El archivo está vacío.');
+  const header = rows[0];
+  const findColumn = (name) => header.findIndex((value) => normalizeHeader(value) === name);
+  const idCol = findColumn('person id');
+  const nameCol = findColumn('name');
+  const timeCol = findColumn('time');
+  const checkPointCol = findColumn('attendance check point');
+  if ([idCol, nameCol, timeCol, checkPointCol].some((column) => column < 0)) {
+    throw new Error('No se encontraron las columnas Person ID, Name, Time y Attendance Check Point en el encabezado.');
+  }
+
+  const registros = [];
+  let ignoradas = 0;
+  let filtradas = 0;
+  for (const row of rows.slice(1)) {
+    if (String(getValue(row, checkPointCol) ?? '').trim() !== ATTENDANCE_CHECK_POINT) {
+      filtradas += 1;
+      continue;
+    }
+    const fecha_hora = parseTime(getValue(row, timeCol));
+    const person_id = String(getValue(row, idCol) ?? '').replace(/\D/g, '');
+    const nombre = String(getValue(row, nameCol) ?? '').trim();
+    if (!fecha_hora || !person_id || !nombre) {
+      ignoradas += 1;
+      continue;
+    }
+    registros.push({ person_id, nombre, fecha_hora });
+  }
+  return { registros, ignoradas, filtradas };
+};
+
 const columnOf = (ref) => ref.replace(/\d+/g, '');
 
+const decodeTextFile = async (file) => {
+  const buffer = await file.arrayBuffer();
+  try {
+    return new TextDecoder('utf-8', { fatal: true }).decode(buffer);
+  } catch {
+    return new TextDecoder('windows-1252').decode(buffer);
+  }
+};
+
 /**
- * Lee un .xlsx de asistencia (columnas Person ID, Name y Time) y devuelve las marcaciones.
- * Las filas con formato pero sin datos se ignoran.
+ * Lee un archivo de asistencia Excel o texto (CSV/TSV/TXT) y devuelve las marcaciones.
  */
 export const parseAttendanceWorkbook = async (file) => {
+  const extension = file.name?.split('.').pop()?.toLowerCase();
+  if (['csv', 'tsv', 'txt'].includes(extension) || file.type?.startsWith('text/')) {
+    const text = await decodeTextFile(file);
+    const firstLine = text.split(/\r?\n/, 1)[0];
+    const delimiter = ['\t', ',', ';'].reduce((best, candidate) => (
+      parseDelimitedRows(firstLine, candidate)[0]?.length > parseDelimitedRows(firstLine, best)[0]?.length ? candidate : best
+    ), ',');
+    return parseAttendanceRows(parseDelimitedRows(text, delimiter), (row, column) => row[column]);
+  }
+  if (extension !== 'xlsx') {
+    throw new Error('Formato no compatible. Selecciona un archivo .xlsx, .csv, .tsv o .txt.');
+  }
+
   const buffer = new Uint8Array(await file.arrayBuffer());
   const files = unzipSync(buffer, {
     filter: (entry) => /^xl\/(sharedStrings\.xml|worksheets\/sheet\d+\.xml)$/.test(entry.name),
@@ -68,26 +163,15 @@ export const parseAttendanceWorkbook = async (file) => {
   if (!rows.length) throw new Error('El archivo está vacío.');
 
   const header = rows[0];
-  const findColumn = (label, fallback) => Object.keys(header).find((col) => String(header[col]).trim().toLowerCase() === label) ?? fallback;
-  const idCol = findColumn('person id', 'A');
-  const nameCol = findColumn('name', 'B');
-  const timeCol = findColumn('time', 'D');
-  if (!/person id|name|time/i.test(Object.values(header).join(' '))) {
-    throw new Error('No se encontraron las columnas Person ID, Name y Time en la primera fila.');
+  const columns = ['person id', 'name', 'time', 'attendance check point'].map((name) => (
+    Object.keys(header).find((col) => normalizeHeader(header[col]) === name)
+  ));
+  if (columns.some((column) => column === undefined)) {
+    throw new Error('No se encontraron las columnas Person ID, Name, Time y Attendance Check Point en la primera fila.');
   }
-
-  const registros = [];
-  let ignoradas = 0;
-  for (const row of rows.slice(1)) {
-    const fecha_hora = parseTime(row[timeCol]);
-    const person_id = String(row[idCol] ?? '').replace(/\D/g, '');
-    const nombre = String(row[nameCol] ?? '').trim();
-    if (!fecha_hora || !person_id || !nombre) {
-      ignoradas += 1;
-      continue;
-    }
-    registros.push({ person_id, nombre, fecha_hora });
-  }
-
-  return { registros, ignoradas };
+  const normalizedRows = [
+    ['person id', 'name', 'time', 'attendance check point'],
+    ...rows.slice(1).map((row) => columns.map((column) => row[column])),
+  ];
+  return parseAttendanceRows(normalizedRows, (row, columnIndex) => row[columnIndex]);
 };

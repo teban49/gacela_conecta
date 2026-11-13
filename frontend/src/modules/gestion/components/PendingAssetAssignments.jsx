@@ -55,6 +55,11 @@ const PendingAssetAssignments = () => {
                 <p className="text-sm text-slate-600">
                   Solicitado por {assignment.SolicitadoPorNombre} {assignment.SolicitadoPorApellidos}
                 </p>
+                {assignment.Observacion && (
+                  <p className="mt-2 whitespace-pre-wrap text-sm text-slate-700">
+                    <span className="font-semibold">Observación:</span> {assignment.Observacion}
+                  </p>
+                )}
               </div>
               <div className="flex gap-2">
                 <button

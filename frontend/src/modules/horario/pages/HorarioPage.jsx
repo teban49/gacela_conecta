@@ -123,8 +123,8 @@ export const HorarioPage = () => {
       ) : report && (
         <>
           {tab === 'general' && <GeneralTab rows={report.dias} />}
-          {tab === 'personas' && <PersonTab rows={report.dias} areas={report.areas} />}
-          {tab === 'ausencias' && <AbsencesTab absences={report.ausencias} areas={report.areas} />}
+          {tab === 'personas' && <PersonTab rows={report.dias} areas={report.areas} areaLimit={report.areaLimit} />}
+          {tab === 'ausencias' && <AbsencesTab absences={report.ausencias} areas={report.areas} areaLimit={report.areaLimit} />}
         </>
       )}
       {showImport && <ImportAttendanceModal onClose={() => setShowImport(false)} onImported={() => load()} />}

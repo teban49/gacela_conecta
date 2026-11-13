@@ -69,7 +69,7 @@ const LoginPage = () => {
               <Mail className="w-8 h-8 text-white" />
             </div>
             <h1 className="text-3xl font-bold text-gray-900 mb-2">Gacela Conecta</h1>
-            <p className="text-gray-600">Ingresa tu correo corporativo para acceder</p>
+            <p className="text-gray-600">Accede con correo corporativo o con usuario y contraseña</p>
           </div>
 
           {/* Form */}
@@ -100,6 +100,7 @@ const LoginPage = () => {
                   required
                   disabled={loading}
                 />
+                <p className="mt-1 text-xs text-gray-500">Si no tienes correo corporativo, ingresa tu número de cédula como usuario.</p>
               </div>
               <div>
                 <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-2">Contraseña</label>

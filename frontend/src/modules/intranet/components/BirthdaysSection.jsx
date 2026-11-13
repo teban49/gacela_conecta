@@ -53,7 +53,7 @@ const BirthdaysSection = () => {
   if (loading) return <div className="flex justify-center py-12"><div className="h-8 w-8 animate-spin rounded-full border-b-2 border-orange-600" /></div>;
   if (error) return <div role="alert" className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>;
   if (!people.length) {
-    return <p className="rounded-2xl border border-dashed border-slate-300 bg-white p-8 text-center text-sm text-slate-500">Aún no hay fechas de nacimiento registradas. Un administrador puede agregarlas desde el Directorio.</p>;
+    return <p className="rounded-2xl border border-dashed border-slate-300 bg-white p-8 text-center text-sm text-slate-500">Aún no hay fechas de nacimiento registradas. Un administrador puede agregarlas desde Administración de usuarios.</p>;
   }
 
   return (

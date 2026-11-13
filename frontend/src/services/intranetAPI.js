@@ -10,7 +10,21 @@ export const intranetAPI = {
   updateOrganigramaPuesto: (id, data) => api.put(`/intranet/organigrama/puestos/${id}`, data),
   deleteOrganigramaPuesto: (id) => api.delete(`/intranet/organigrama/puestos/${id}`),
   getCalidadDocumentos: (empresaId) => api.get('/intranet/calidad/documentos', { params: { EmpresaId: empresaId } }),
-  descargarCalidadDocumento: (empresaId, area, archivo, categoria = '') => api.get(
+  uploadLibraryDocument: (kind, values) => {
+    const body = new FormData();
+    body.append('Empresa', values.Empresa);
+    body.append('Categoria', values.Categoria ?? '');
+    body.append('Titulo', values.Titulo);
+    body.append('Archivo', values.Archivo);
+    return api.post(`/intranet/libraries/${encodeURIComponent(kind)}/documents`, body, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+  },
+  deleteLibraryDocument: (kind, values) => api.delete(
+    `/intranet/libraries/${encodeURIComponent(kind)}/documents`,
+    { data: values },
+  ),
+  verCalidadDocumento: (empresaId, area, archivo, categoria = '') => api.get(
     `/intranet/calidad/empresas/${empresaId}/${encodeURIComponent(area)}/${encodeURIComponent(archivo)}`,
     { responseType: 'blob', params: { Categoria: categoria } },
   ),
@@ -41,4 +55,5 @@ export const intranetAPI = {
     });
   },
   deleteManual: (id) => api.delete(`/intranet/manuales/${encodeURIComponent(id)}`),
+  changeDocumentoStatus: (id, estado) => api.patch(`/intranet/documentos/${id}/status`, { Estado: estado }),
 };

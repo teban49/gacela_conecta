@@ -136,6 +136,14 @@ const router = createBrowserRouter([
         ),
       },
       {
+        path: '/formatos',
+        element: <Navigate to="/intranet/formatos" replace />,
+      },
+      {
+        path: '/documentacion',
+        element: <Navigate to="/intranet/documentacion" replace />,
+      },
+      {
         path: '/security',
         element: (
           <PermissionRoute requiredPermission="seguridad.ver">

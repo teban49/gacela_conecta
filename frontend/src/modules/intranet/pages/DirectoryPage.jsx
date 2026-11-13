@@ -15,11 +15,18 @@ const columns = [
   ['empresa', 'Empresa'],
 ];
 
+const PAGE_SIZE = 100;
+const normalizeSearch = (value) => String(value ?? '')
+  .toLocaleLowerCase()
+  .normalize('NFD')
+  .replace(/[\u0300-\u036f]/g, '');
+
 const DirectoryPage = ({ embedded = false }) => {
   const [entries, setEntries] = useState([]);
   const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
 
   const loadDirectory = async () => {
     setLoading(true);
@@ -39,11 +46,11 @@ const DirectoryPage = ({ embedded = false }) => {
   }, []);
 
   const filteredEntries = useMemo(() => {
-    const normalizedSearch = search.trim().toLocaleLowerCase();
+    const normalizedSearch = normalizeSearch(search.trim());
     if (!normalizedSearch) return entries;
 
     return entries.filter((entry) =>
-      columns.some(([key]) => String(entry[key] ?? '').toLocaleLowerCase().includes(normalizedSearch))
+      columns.some(([key]) => normalizeSearch(entry[key]).includes(normalizedSearch))
     );
   }, [entries, search]);
 
@@ -60,7 +67,7 @@ const DirectoryPage = ({ embedded = false }) => {
             <div className="rounded-2xl bg-orange-100 p-3 text-orange-700"><Users size={24} /></div>
             <div>
               <h1 className="text-2xl font-bold text-slate-900">Directorio</h1>
-              <p className="text-sm text-slate-500">Todos los contactos y campos registrados en el directorio.</p>
+              <p className="text-sm text-slate-500">Contactos activos con correo registrado en Administración de usuarios.</p>
             </div>
           </div>
         </div>
@@ -70,7 +77,10 @@ const DirectoryPage = ({ embedded = false }) => {
           <input
             type="search"
             value={search}
-            onChange={(event) => setSearch(event.target.value)}
+            onChange={(event) => {
+              setSearch(event.target.value);
+              setVisibleCount(PAGE_SIZE);
+            }}
             placeholder="Buscar en todos los campos..."
             aria-label="Buscar en el directorio"
             className="w-full rounded-xl border border-slate-200 py-3 pl-10 pr-4 text-sm outline-none focus:border-orange-400 focus:ring-2 focus:ring-orange-100"
@@ -114,7 +124,7 @@ const DirectoryPage = ({ embedded = false }) => {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {filteredEntries.map((entry) => (
+                {filteredEntries.slice(0, visibleCount).map((entry) => (
                   <tr key={entry.id} className="hover:bg-orange-50/40">
                     {columns.map(([key]) => (
                       <td key={key} className={`break-words px-2 py-3 text-slate-700 ${key === 'email' ? '[overflow-wrap:anywhere]' : ''}`}>
@@ -129,6 +139,13 @@ const DirectoryPage = ({ embedded = false }) => {
                 ))}
               </tbody>
             </table>
+          </div>
+        )}
+        {!loading && !error && visibleCount < filteredEntries.length && (
+          <div className="border-t border-slate-100 p-4 text-center">
+            <button type="button" onClick={() => setVisibleCount((count) => count + PAGE_SIZE)} className="rounded-xl border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50">
+              Mostrar más ({filteredEntries.length - visibleCount} restantes)
+            </button>
           </div>
         )}
       </section>

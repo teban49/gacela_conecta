@@ -7,8 +7,8 @@ import { applicationsAPI } from '../services/applicationsAPI';
 import { GESTION_EXTERNAL_URL, usesExternalGestion } from '../utils/gestionAccess';
 
 // Módulos aún no implementados: se ocultan del menú, sin eliminar sus definiciones ni iconos
-const HIDDEN_APP_CODES = ['incidencias', 'inventario', 'seguridad', 'configuracion', 'fondo_reposicion'];
-const HIDDEN_APP_ROUTES = ['/incidencias', '/inventario', '/seguridad', '/security', '/configuracion', '/fondo-reposicion'];
+const HIDDEN_APP_CODES = ['incidencias', 'inventario', 'seguridad', 'configuracion', 'fondo_reposicion', 'formatos', 'documentacion'];
+const HIDDEN_APP_ROUTES = ['/incidencias', '/inventario', '/seguridad', '/security', '/configuracion', '/fondo-reposicion', '/formatos', '/documentacion'];
 export const Sidebar = () => {
   const location = useLocation();
   const { user, hasPermission } = useAuth();

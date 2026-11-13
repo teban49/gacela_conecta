@@ -1,0 +1,34 @@
+{
+  "Flota": {
+    "compras": [
+      { "titulo": "FOR-006 GASTOS DE TRANSPORTE TERRESTRES", "archivo": "FOR-006 GASTOS DE TRANSPORTE TERRESTRES.pdf" },
+      { "titulo": "FOR-007 LEGALIZACION GASTOS DE VIAJE", "archivo": "FOR-007 LEGALIZACION GASTOS DE VIAJE.pdf" }
+    ],
+    "gestion humana": [
+      { "titulo": "FOR-009 Autorizacion descuento nomina", "archivo": "FOR-009 Autorizacion descuento nomina.pdf" },
+      { "titulo": "FOR-010 Solicitud Permiso Administrativo FM", "archivo": "FOR-010 Solicitud Permiso Administrativo FM.pdf" },
+      { "titulo": "FOR-011 Paz y Salvo Personal Administrativo", "archivo": "FOR-011 Paz y Salvo Personal Administrativo.pdf" },
+      { "titulo": "FOR-012 Paz y Salvo Personal Operativo", "archivo": "FOR-012 Paz y Salvo Personal Operativo.pdf" },
+      { "titulo": "FOR-018 Solicitud de Vacaciones", "archivo": "FOR-018 Solicitud de Vacaciones.pdf" },
+      { "titulo": "FOR-019 Solicitud de ingreso o traslado de vehiculo", "archivo": "FOR-019 Solicitud de ingreso o traslado de vehiculo.pdf" },
+      { "titulo": "FOR-021 Solicitud Retiro de Cesantias", "archivo": "FOR-021 Solicitud Retiro de Cesantias.pdf" }
+    ],
+    "servicio al cliente": [],
+    "sistemas": [
+      { "titulo": "FOR-004 AUTORIZACION WI-FI BUS", "archivo": "FOR-004 AUTORIZACION WI-FI BUS.pdf" },
+      { "titulo": "FOR-008 SOLICITUD PERSONAL NUEVO", "archivo": "FOR-008 SOLICITUD PERSONAL NUEVO.pdf" }
+    ]
+  },
+  "PDR": {
+    "compras": [],
+    "gestion humana": [],
+    "servicio al cliente": [],
+    "sistemas": []
+  },
+  "RD": {
+    "compras": [],
+    "gestion humana": [],
+    "servicio al cliente": [],
+    "sistemas": []
+  }
+}

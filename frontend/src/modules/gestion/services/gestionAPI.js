@@ -32,11 +32,14 @@ export const gestionAPI = {
   updateActivo: (id, data) => api.put(`/gestion/activos/${id}`, data),
   changeActivoStatus: (id, estado) => api.patch(`/gestion/activos/${id}/status`, { Estado: estado }),
   changeActivoAssetStatus: (id, estadoActivo) => api.patch(`/gestion/activos/${id}/asset-status`, { EstadoActivo: estadoActivo }),
-  assignActivo: (id, usuarioId) => api.post(`/gestion/activos/${id}/assign`, { UsuarioId: usuarioId }),
+  assignActivo: (id, usuarioId, observacion) => api.post(`/gestion/activos/${id}/assign`, {
+    UsuarioId: usuarioId,
+    Observacion: observacion,
+  }),
   unassignActivo: (id) => api.delete(`/gestion/activos/${id}/assignment`),
   retireActivo: (id) => api.post(`/gestion/activos/${id}/retire`),
 
-  // Mantenimiento semestral
+  // Mantenimiento semestral desde la fecha de vencimiento de garantía
   getMantenimientosPendientes: () => api.get('/gestion/mantenimientos/pendientes'),
   completarMantenimiento: (activoId, anio, semestre, data) => api.post(`/gestion/mantenimientos/${activoId}/anio/${anio}/semestre/${semestre}/completar`, data),
 

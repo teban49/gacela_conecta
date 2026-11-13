@@ -47,6 +47,7 @@ class SolicitudService
         $titulo = is_string($data['Titulo'] ?? null) ? trim($data['Titulo']) : '';
         $descripcion = is_string($data['Descripcion'] ?? null) ? trim($data['Descripcion']) : '';
         $categoriaId = filter_var($data['CategoriaId'] ?? null, FILTER_VALIDATE_INT);
+        $categoria = null;
 
         if ($titulo === '') {
             $errors['Titulo'] = ['El título es obligatorio.'];
@@ -68,8 +69,31 @@ class SolicitudService
             }
         }
 
+        $subcategoria = $data['Subcategoria'] ?? '';
+        if (!is_string($subcategoria)) {
+            $errors['Subcategoria'] = ['Selecciona una subcategoría válida.'];
+        } else {
+            $subcategoria = trim($subcategoria);
+            if (mb_strlen($subcategoria) > 150) {
+                $errors['Subcategoria'] = ['La subcategoría no puede superar 150 caracteres.'];
+            } elseif (($data['Tipo'] ?? '') === 'incidencia' && is_int($categoriaId) && $categoriaId > 0) {
+                $subcategories = array_column(
+                    $this->categoriaRepository->getActiveSubcategories($categoriaId),
+                    'Nombre'
+                );
+                if ($subcategories && !in_array($subcategoria, $subcategories, true)) {
+                    $errors['Subcategoria'] = ['Selecciona una subcategoría válida para la categoría.'];
+                } elseif ($subcategories && $subcategoria === '') {
+                    $errors['Subcategoria'] = ['Selecciona una subcategoría.'];
+                } elseif (!$subcategories && $subcategoria !== '') {
+                    $errors['Subcategoria'] = ['La categoría seleccionada no tiene subcategorías.'];
+                }
+            }
+        }
+
         $allowedPriorities = ['baja', 'media', 'alta', 'critica'];
-        if (isset($data['Prioridad']) && (!is_string($data['Prioridad']) || !in_array($data['Prioridad'], $allowedPriorities, true))) {
+        $isIncident = ($data['Tipo'] ?? 'soporte') === 'incidencia';
+        if (!$isIncident && isset($data['Prioridad']) && (!is_string($data['Prioridad']) || !in_array($data['Prioridad'], $allowedPriorities, true))) {
             $errors['Prioridad'] = ['Selecciona una prioridad válida.'];
         }
 
@@ -89,11 +113,15 @@ class SolicitudService
         $data['Titulo'] = $titulo;
         $data['Descripcion'] = $descripcion;
         $data['CategoriaId'] = $categoriaId;
+        $data['Subcategoria'] = $subcategoria !== '' ? $subcategoria : null;
+        $data['Prioridad'] = $isIncident ? 'baja' : ($data['Prioridad'] ?? 'media');
         $data['Estado'] = 'nueva';
         $data['Canal'] = 'portal';
         $data['AsignadoA'] = null;
         $data['ArchivoAdjunto'] = $data['ArchivoAdjunto'] ?? null;
-        $data['FechaVencimiento'] = null;
+        $data['FechaVencimiento'] = $isIncident
+            ? TicketSla::deadlineForPriority($data['Prioridad'])
+            : null;
 
         $id = $this->repository->create($data);
 

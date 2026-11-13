@@ -10,76 +10,80 @@ class MantenimientoRepository extends BaseRepository
     public function getPending(): array
     {
         $stmt = $this->db->query("
-            WITH RECURSIVE periodos (ActivoId, Anio, Semestre) AS (
+            WITH RECURSIVE periodos (ActivoId, FechaProgramada, Anio, Semestre) AS (
                 SELECT a.Id,
-                       YEAR(COALESCE(a.FechaInicio, DATE(a.FechaCreacion))),
-                       IF(MONTH(COALESCE(a.FechaInicio, DATE(a.FechaCreacion))) <= 6, 1, 2)
+                       DATE_ADD(DATE(a.FechaFin), INTERVAL 6 MONTH),
+                       YEAR(DATE_ADD(DATE(a.FechaFin), INTERVAL 6 MONTH)),
+                       IF(MONTH(DATE_ADD(DATE(a.FechaFin), INTERVAL 6 MONTH)) <= 6, 1, 2)
                 FROM gestion_activos a
                 WHERE a.Estado = 1
                   AND a.EstadoActivo <> 'retirado'
-                  AND COALESCE(a.FechaInicio, DATE(a.FechaCreacion)) <= CURRENT_DATE
+                  AND a.TipoPropiedad = 'propio'
+                  AND a.FechaFin IS NOT NULL
+                  AND DATE_ADD(DATE(a.FechaFin), INTERVAL 6 MONTH) <= CURRENT_DATE
                 UNION ALL
                 SELECT ActivoId,
-                       Anio + IF(Semestre = 2, 1, 0),
-                       IF(Semestre = 1, 2, 1)
+                       DATE_ADD(FechaProgramada, INTERVAL 6 MONTH),
+                       YEAR(DATE_ADD(FechaProgramada, INTERVAL 6 MONTH)),
+                       IF(MONTH(DATE_ADD(FechaProgramada, INTERVAL 6 MONTH)) <= 6, 1, 2)
                 FROM periodos
-                WHERE Anio < YEAR(CURRENT_DATE)
-                   OR (Anio = YEAR(CURRENT_DATE)
-                       AND Semestre < IF(MONTH(CURRENT_DATE) <= 6, 1, 2))
+                WHERE DATE_ADD(FechaProgramada, INTERVAL 6 MONTH) <= CURRENT_DATE
             )
             SELECT a.Id AS ActivoId, a.CodigoInventario, a.Placa, a.EmpresaId,
                    e.Nombre AS EmpresaNombre, c.Nombre AS TipoActivo,
+                   agencia.Nombre AS AgenciaNombre,
                    periodo.Anio, periodo.Semestre,
-                   STR_TO_DATE(
-                       CONCAT(periodo.Anio, IF(periodo.Semestre = 1, '-06-30', '-12-31')),
-                       '%Y-%m-%d'
-                   ) AS FechaLimite
+                   periodo.FechaProgramada AS FechaLimite
             FROM gestion_activos a
             INNER JOIN gestion_activos_categorias c ON c.Id = a.CategoriaId
             LEFT JOIN gcp_empresas e ON e.Id = a.EmpresaId
+            LEFT JOIN gcp_usuarios asignado ON asignado.Id = a.AsignadoA
+            LEFT JOIN gcp_agencias agencia ON agencia.Id = asignado.AgenciaId
             INNER JOIN periodos periodo ON periodo.ActivoId = a.Id
             LEFT JOIN gestion_mantenimiento m
                 ON m.ActivoId = a.Id
-                AND m.Anio = periodo.Anio
-                AND m.Semestre = periodo.Semestre
+                AND m.FechaProgramada = periodo.FechaProgramada
             WHERE a.Estado = 1
               AND a.EstadoActivo <> 'retirado'
+              AND a.TipoPropiedad = 'propio'
               AND (m.Id IS NULL OR m.Estado <> 'completado')
             ORDER BY periodo.Anio ASC, periodo.Semestre ASC, a.CodigoInventario ASC
         ");
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
     }
 
-    public function isEligiblePeriod(int $assetId, int $year, int $semester): bool
+    public function isEligiblePeriod(int $assetId, int $year, int $semester, string $scheduledDate): bool
     {
         $stmt = $this->db->prepare("
+            WITH RECURSIVE periodos (FechaProgramada, Anio, Semestre) AS (
+                SELECT DATE_ADD(DATE(a.FechaFin), INTERVAL 6 MONTH),
+                       YEAR(DATE_ADD(DATE(a.FechaFin), INTERVAL 6 MONTH)),
+                       IF(MONTH(DATE_ADD(DATE(a.FechaFin), INTERVAL 6 MONTH)) <= 6, 1, 2)
+                FROM gestion_activos a
+                WHERE a.Id = :Id
+                  AND a.Estado = 1
+                  AND a.EstadoActivo <> 'retirado'
+                  AND a.TipoPropiedad = 'propio'
+                  AND a.FechaFin IS NOT NULL
+                  AND DATE_ADD(DATE(a.FechaFin), INTERVAL 6 MONTH) <= CURRENT_DATE
+                UNION ALL
+                SELECT DATE_ADD(FechaProgramada, INTERVAL 6 MONTH),
+                       YEAR(DATE_ADD(FechaProgramada, INTERVAL 6 MONTH)),
+                       IF(MONTH(DATE_ADD(FechaProgramada, INTERVAL 6 MONTH)) <= 6, 1, 2)
+                FROM periodos
+                WHERE DATE_ADD(FechaProgramada, INTERVAL 6 MONTH) <= CURRENT_DATE
+            )
             SELECT 1
-            FROM gestion_activos a
-            WHERE a.Id = :Id
-              AND a.Estado = 1
-              AND a.EstadoActivo <> 'retirado'
-              AND COALESCE(a.FechaInicio, DATE(a.FechaCreacion)) <= CURRENT_DATE
-              AND (
-                    YEAR(COALESCE(a.FechaInicio, DATE(a.FechaCreacion))) < :AnioInicial
-                    OR (
-                        YEAR(COALESCE(a.FechaInicio, DATE(a.FechaCreacion))) = :AnioComparacion
-                        AND IF(MONTH(COALESCE(a.FechaInicio, DATE(a.FechaCreacion))) <= 6, 1, 2) <= :SemestreInicial
-                    )
-              )
-              AND (
-                    :AnioActual1 < YEAR(CURRENT_DATE)
-                    OR (:AnioActual2 = YEAR(CURRENT_DATE)
-                        AND :SemestreActual <= IF(MONTH(CURRENT_DATE) <= 6, 1, 2))
-              )
+            FROM periodos
+            WHERE Anio = :Anio
+              AND Semestre = :Semestre
+              AND FechaProgramada = :FechaProgramada
         ");
         $stmt->execute([
             ':Id' => $assetId,
-            ':AnioInicial' => $year,
-            ':AnioComparacion' => $year,
-            ':SemestreInicial' => $semester,
-            ':AnioActual1' => $year,
-            ':AnioActual2' => $year,
-            ':SemestreActual' => $semester,
+            ':Anio' => $year,
+            ':Semestre' => $semester,
+            ':FechaProgramada' => $scheduledDate,
         ]);
         return (bool) $stmt->fetchColumn();
     }
@@ -91,20 +95,19 @@ class MantenimientoRepository extends BaseRepository
         return (bool) $stmt->fetchColumn();
     }
 
-    public function complete(int $assetId, int $year, int $semester, string $executor, ?int $supplierId, int $userId): bool
+    public function complete(int $assetId, int $year, int $semester, string $scheduledDate, string $executor, ?int $supplierId, int $userId): bool
     {
         $this->db->beginTransaction();
         try {
             $existingStmt = $this->db->prepare("
                 SELECT Id, Estado
                 FROM gestion_mantenimiento
-                WHERE ActivoId = :ActivoId AND Anio = :Anio AND Semestre = :Semestre
+                WHERE ActivoId = :ActivoId AND FechaProgramada = :FechaProgramada
                 FOR UPDATE
             ");
             $existingStmt->execute([
                 ':ActivoId' => $assetId,
-                ':Anio' => $year,
-                ':Semestre' => $semester,
+                ':FechaProgramada' => $scheduledDate,
             ]);
             $existing = $existingStmt->fetch(PDO::FETCH_ASSOC);
             if ($existing && $existing['Estado'] === 'completado') {
@@ -113,7 +116,6 @@ class MantenimientoRepository extends BaseRepository
             }
 
             $description = 'Mantenimiento preventivo semestral ' . $year . ' - semestre ' . $semester;
-            $scheduledDate = $year . ($semester === 1 ? '-06-30' : '-12-31');
             if ($existing) {
                 $stmt = $this->db->prepare("
                     UPDATE gestion_mantenimiento

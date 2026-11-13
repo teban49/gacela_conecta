@@ -65,7 +65,15 @@ try {
         '034_solicitudes_dotacion.sql',
         '035_talla_dotacion.sql',
         '036_entregas_dotacion_registro.sql',
-        '037_correccion_ortografica_catalogos.sql'
+        '037_correccion_ortografica_catalogos.sql',
+        '038_cumpleanos_e_importacion_asistencia.sql',
+        '039_centralizacion_usuarios.sql',
+        '040_limpieza_tablas_sin_uso.sql',
+        '041_directorio_todos_usuarios_activos.sql',
+        '042_directorio_filtro_correo.sql',
+        '043_gestion_catalogos_y_subcategorias.sql',
+        '044_incident_sla_backfill.sql',
+        '045_username_without_email_uses_cedula.sql'
     ];
     
     foreach ($migrations as $migrationFile) {

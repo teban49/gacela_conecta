@@ -157,8 +157,14 @@ class ActivoController
     {
         $data = Request::json();
         $usuarioId = $data['UsuarioId'] ?? 0;
+        $observation = $data['Observacion'] ?? null;
         $user = Auth::user();
-        $result = $this->service->assignTo($id, (int) $usuarioId, (int) ($user['id'] ?? 0));
+        $result = $this->service->assignTo(
+            $id,
+            (int) $usuarioId,
+            (int) ($user['id'] ?? 0),
+            $observation
+        );
 
         if ($result['success']) {
             Response::success($result['data'] ?? null, $result['message']);

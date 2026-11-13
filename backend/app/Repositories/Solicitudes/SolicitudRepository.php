@@ -206,7 +206,7 @@ class SolicitudRepository extends BaseRepository
     {
         $this->db->beginTransaction();
         try {
-            $currentStmt = $this->db->prepare("SELECT Estado, AsignadoA FROM {$this->table} WHERE Id = :Id AND Tipo = 'incidencia' FOR UPDATE");
+            $currentStmt = $this->db->prepare("SELECT Estado, AsignadoA, FechaResolucion FROM {$this->table} WHERE Id = :Id AND Tipo = 'incidencia' FOR UPDATE");
             $currentStmt->execute([':Id' => $id]);
             $current = $currentStmt->fetch(PDO::FETCH_ASSOC);
             if (!$current) {
@@ -226,15 +226,24 @@ class SolicitudRepository extends BaseRepository
             if (array_key_exists('Estado', $data) || $firstResponse) {
                 $fields[] = 'Estado = :Estado';
                 $params[':Estado'] = $nextStatus;
-                if ($nextStatus === 'cerrada' && $current['Estado'] !== 'cerrada') {
+                if (
+                    $nextStatus === 'pendiente'
+                    && array_key_exists('Estado', $data)
+                    && $data['Estado'] === 'pendiente'
+                    && $current['FechaResolucion'] === null
+                ) {
                     $fields[] = 'FechaResolucion = CURRENT_TIMESTAMP';
-                } elseif ($current['Estado'] === 'cerrada') {
+                } elseif ($nextStatus === 'nueva' && $current['FechaResolucion'] !== null) {
                     $fields[] = 'FechaResolucion = NULL';
                 }
             }
             if (array_key_exists('Prioridad', $data)) {
                 $fields[] = 'Prioridad = :Prioridad';
                 $params[':Prioridad'] = $data['Prioridad'];
+            }
+            if (array_key_exists('FechaVencimiento', $data)) {
+                $fields[] = 'FechaVencimiento = :FechaVencimiento';
+                $params[':FechaVencimiento'] = $data['FechaVencimiento'];
             }
             if ($firstResponse) {
                 $fields[] = 'AsignadoA = :AsignadoA';
@@ -280,14 +289,14 @@ class SolicitudRepository extends BaseRepository
         $this->db->beginTransaction();
         try {
             $stmt = $this->db->prepare("
-                SELECT Estado
+                SELECT Estado, FechaResolucion
                 FROM {$this->table}
                 WHERE Id = :Id AND SolicitanteId = :UsuarioId AND Tipo = 'incidencia'
                 FOR UPDATE
             ");
             $stmt->execute([':Id' => $id, ':UsuarioId' => $userId]);
             $ticket = $stmt->fetch(PDO::FETCH_ASSOC);
-            if (!$ticket || $ticket['Estado'] !== 'pendiente') {
+            if (!$ticket || $ticket['Estado'] !== 'pendiente' || $ticket['FechaResolucion'] === null) {
                 $this->db->rollBack();
                 return false;
             }
@@ -295,12 +304,12 @@ class SolicitudRepository extends BaseRepository
             $update = $this->db->prepare("
                 UPDATE {$this->table}
                 SET Estado = 'cerrada',
-                    FechaResolucion = CURRENT_TIMESTAMP,
+                    FechaResolucion = COALESCE(FechaResolucion, CURRENT_TIMESTAMP),
                     SatisfaccionTiempoSolucion = :Tiempo,
                     SatisfaccionCalidadAtencion = :Calidad,
                     SatisfaccionEficaciaSolucion = :Eficacia,
                     ComentarioSatisfaccion = :Comentario
-                WHERE Id = :Id AND SolicitanteId = :UsuarioId AND Estado = 'pendiente'
+                WHERE Id = :Id AND SolicitanteId = :UsuarioId AND Estado = 'pendiente' AND FechaResolucion IS NOT NULL
             ");
             $update->execute([
                 ':Id' => $id,
@@ -353,14 +362,15 @@ class SolicitudRepository extends BaseRepository
         $ticket = $this->generateTicket();
         
         $sql = "
-            INSERT INTO {$this->table} (Ticket, CategoriaId, SolicitanteId, EmpresaId, ActivoId, AsignadoA, Prioridad, Estado, Tipo, Titulo, Descripcion, Ubicacion, ArchivoAdjunto, ArchivoAdjuntoNombre, Canal, FechaVencimiento)
-            VALUES (:Ticket, :CategoriaId, :SolicitanteId, :EmpresaId, :ActivoId, :AsignadoA, :Prioridad, :Estado, :Tipo, :Titulo, :Descripcion, :Ubicacion, :ArchivoAdjunto, :ArchivoAdjuntoNombre, :Canal, :FechaVencimiento)
+            INSERT INTO {$this->table} (Ticket, CategoriaId, Subcategoria, SolicitanteId, EmpresaId, ActivoId, AsignadoA, Prioridad, Estado, Tipo, Titulo, Descripcion, Ubicacion, ArchivoAdjunto, ArchivoAdjuntoNombre, Canal, FechaVencimiento)
+            VALUES (:Ticket, :CategoriaId, :Subcategoria, :SolicitanteId, :EmpresaId, :ActivoId, :AsignadoA, :Prioridad, :Estado, :Tipo, :Titulo, :Descripcion, :Ubicacion, :ArchivoAdjunto, :ArchivoAdjuntoNombre, :Canal, :FechaVencimiento)
         ";
 
         $stmt = $this->db->prepare($sql);
         $stmt->execute([
             ':Ticket' => $ticket,
             ':CategoriaId' => $solicitud['CategoriaId'],
+            ':Subcategoria' => $solicitud['Subcategoria'] ?? null,
             ':SolicitanteId' => $solicitud['SolicitanteId'],
             ':EmpresaId' => $solicitud['EmpresaId'] ?? null,
             ':ActivoId' => $solicitud['ActivoId'] ?? null,

@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Plus, Edit, Package, Search, User, Calendar, Building2, AlertCircle, CheckCircle, Wrench, UserPlus, UserMinus, Archive, X, Ticket, MessageSquare, Send, Download } from 'lucide-react';
 import { gestionAPI } from '../services/gestionAPI';
 import { useAuth } from '../../../contexts/AuthContext';
+import { downloadRowsAsXlsx } from '../../../utils/xlsx';
 
 const satisfactionLabels = {
   muy_satisfecho: 'Muy satisfecho',
@@ -10,8 +11,27 @@ const satisfactionLabels = {
   muy_insatisfecho: 'Muy insatisfecho',
 };
 
+const incidentPriorityResponseTimes = {
+  baja: '1 mes',
+  media: '3 semanas',
+  alta: '2 semanas',
+  critica: '1 semana',
+};
+
 const GestionPage = () => {
   const { hasPermission, user } = useAuth();
+  const hasAllCompanyAccess = (user?.roles ?? []).some((role) => {
+    const code = typeof role === 'object' ? role.Codigo : role;
+    const name = typeof role === 'object' ? role.Nombre : '';
+    return ['admin', 'superadmin', 'directivos'].includes(code) || name === 'Administrador';
+  });
+  const assignedCompanyIds = new Set((user?.organization?.Empresas ?? []).map((company) => String(company.Id)));
+  const inCompanyScope = (items) => hasAllCompanyAccess
+    ? items
+    : items.filter((item) => assignedCompanyIds.has(String(item.EmpresaId)));
+  const inCompanyOptions = (items) => hasAllCompanyAccess
+    ? items
+    : items.filter((company) => assignedCompanyIds.has(String(company.Id)));
   const canViewAllManagement = hasPermission('gestion.ver');
   const canViewIncidents = canViewAllManagement || hasPermission('gestion.incidencias.ver');
   const [activeTab, setActiveTab] = useState(() => (
@@ -28,12 +48,14 @@ const GestionPage = () => {
   const [users, setUsers] = useState([]);
   const [selectedUser, setSelectedUser] = useState('');
   const [userSearch, setUserSearch] = useState('');
+  const [assignmentObservation, setAssignmentObservation] = useState('');
   const [savingAssignment, setSavingAssignment] = useState(false);
+  const [assetUserFilter, setAssetUserFilter] = useState('');
+  const [assetLocationFilter, setAssetLocationFilter] = useState('');
+  const [maintenanceAgencyFilter, setMaintenanceAgencyFilter] = useState('');
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [editingAsset, setEditingAsset] = useState(null);
   const [savingAsset, setSavingAsset] = useState(false);
-  const [newSupplierName, setNewSupplierName] = useState('');
-  const [addingSupplier, setAddingSupplier] = useState(false);
   const [assetForm, setAssetForm] = useState({
     CategoriaId: '',
     EmpresaId: '',
@@ -61,7 +83,7 @@ const GestionPage = () => {
   const [incidentStatusFilter, setIncidentStatusFilter] = useState('todas');
   const [incidentForm, setIncidentForm] = useState({
     CategoriaId: '',
-    Prioridad: 'media',
+    Subcategoria: '',
     Titulo: '',
     Descripcion: '',
     EmpresaId: '',
@@ -150,25 +172,38 @@ const GestionPage = () => {
       }
       if (!managementData) return;
       const [res, categoriesResponse, companiesResponse, providersResponse, maintenanceResponse, licensesResponse, licenseOptionsResponse] = managementData;
-      setActivos(res.data?.data ?? []);
+      const activeAssets = inCompanyScope(res.data?.data ?? []);
       const activeCategories = categoriesResponse.data?.data ?? [];
-      const activeCompanies = companiesResponse.data?.data ?? [];
+      const activeCompanies = inCompanyOptions(companiesResponse.data?.data ?? []);
       const activeProviders = providersResponse.data?.data ?? [];
+      const activeMaintenance = inCompanyScope(maintenanceResponse.data?.data ?? []);
+      const activeLicenses = inCompanyScope(licensesResponse.data?.data ?? []);
+      const licenseOptionsData = licenseOptionsResponse.data?.data ?? { Empresas: [], Roles: [], Activos: [] };
+      const scopedLicenseOptions = {
+        ...licenseOptionsData,
+        Empresas: inCompanyOptions(licenseOptionsData.Empresas ?? []),
+        Activos: inCompanyScope(licenseOptionsData.Activos ?? []),
+      };
+      setActivos(activeAssets);
       setCategorias(activeCategories);
       setEmpresas(activeCompanies);
       setProveedores(activeProviders);
-      setMantenimientos(maintenanceResponse.data?.data ?? []);
-      setLicencias(licensesResponse.data?.data ?? []);
-      setLicenseOptions(licenseOptionsResponse.data?.data ?? { Empresas: [], Roles: [], Activos: [] });
+      setMantenimientos(activeMaintenance);
+      setLicencias(activeLicenses);
+      setLicenseOptions(scopedLicenseOptions);
       setAssetForm((current) => ({
         ...current,
         CategoriaId: current.CategoriaId || (activeCategories[0]?.Id ? String(activeCategories[0].Id) : ''),
-        EmpresaId: current.EmpresaId || (activeCompanies[0]?.Id ? String(activeCompanies[0].Id) : ''),
+        EmpresaId: activeCompanies.some((company) => String(company.Id) === current.EmpresaId)
+          ? current.EmpresaId
+          : (activeCompanies[0]?.Id ? String(activeCompanies[0].Id) : ''),
       }));
       setLicenseForm((current) => ({
         ...current,
-        EmpresaId: current.EmpresaId || (licenseOptionsResponse.data?.data?.Empresas?.[0]?.Id ? String(licenseOptionsResponse.data.data.Empresas[0].Id) : ''),
-        RolId: current.RolId || (licenseOptionsResponse.data?.data?.Roles?.[0]?.Id ? String(licenseOptionsResponse.data.data.Roles[0].Id) : ''),
+        EmpresaId: scopedLicenseOptions.Empresas.some((company) => String(company.Id) === current.EmpresaId)
+          ? current.EmpresaId
+          : (scopedLicenseOptions.Empresas[0]?.Id ? String(scopedLicenseOptions.Empresas[0].Id) : ''),
+        RolId: current.RolId || (scopedLicenseOptions.Roles?.[0]?.Id ? String(scopedLicenseOptions.Roles[0].Id) : ''),
       }));
     } catch (error) {
       console.error('Error loading data:', error);
@@ -183,13 +218,73 @@ const GestionPage = () => {
                          a.CodigoInventario?.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          a.Placa?.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          a.Marca?.toLowerCase().includes(searchTerm.toLowerCase());
-    return matchesSearch;
+    return matchesSearch
+      && (!assetUserFilter || String(a.AsignadoA ?? '') === assetUserFilter)
+      && (!assetLocationFilter || a.UbicacionAsignado === assetLocationFilter);
   });
+  const exportFilteredAssets = () => {
+    const fullName = (firstName, lastName) => [firstName, lastName].filter(Boolean).join(' ');
+    const rows = [
+      [
+        'Código de inventario', 'Tipo de activo', 'Empresa', 'Estado', 'Tipo de propiedad',
+        'Placa', 'Marca', 'Modelo', 'Número de serie', 'Usuario asignado', 'Asignado por',
+        'Agencia / lugar', 'Proveedor', 'Número de factura/contrato', 'Fecha de compra/inicio',
+        'Fecha fin de garantía/contrato', 'Observación de asignación', 'Observaciones',
+      ],
+      ...filteredActivos.map((asset) => [
+        asset.CodigoInventario,
+        asset.CategoriaNombre,
+        asset.EmpresaNombre,
+        (asset.EstadoActivo ?? 'nuevo').replace('_', ' '),
+        asset.TipoPropiedad === 'arriendo' ? 'En arriendo' : asset.TipoPropiedad === 'propio' ? 'Propio' : '',
+        asset.Placa,
+        asset.Marca,
+        asset.Modelo,
+        asset.NumeroSerie,
+        fullName(asset.AsignadoNombre, asset.AsignadoApellidos),
+        fullName(asset.AsignadoPorNombre, asset.AsignadoPorApellidos),
+        asset.UbicacionAsignado,
+        asset.ProveedorNombre,
+        asset.NumeroFacturaContrato,
+        asset.FechaInicio,
+        asset.FechaFin,
+        asset.ObservacionAsignacion,
+        asset.Observaciones,
+      ]),
+    ];
+    const date = new Date().toISOString().slice(0, 10);
+    downloadRowsAsXlsx(rows, `activos_gestion_tecnologica_${date}`);
+  };
+  const assetAssignees = [...new Map(activos
+    .filter((asset) => asset.AsignadoA)
+    .map((asset) => [String(asset.AsignadoA), {
+      Id: String(asset.AsignadoA),
+      Nombre: `${asset.AsignadoNombre ?? ''} ${asset.AsignadoApellidos ?? ''}`.trim(),
+    }])).values()].sort((left, right) => left.Nombre.localeCompare(right.Nombre));
+  const assetLocations = [...new Set(activos
+    .map((asset) => asset.UbicacionAsignado)
+    .filter(Boolean))].sort((left, right) => left.localeCompare(right));
   const filteredMantenimientos = mantenimientos.filter((maintenance) => (
-    `${maintenance.TipoActivo ?? ''} ${maintenance.CodigoInventario ?? ''} ${maintenance.Placa ?? ''} ${maintenance.EmpresaNombre ?? ''} ${maintenance.Anio ?? ''} ${maintenance.Semestre ?? ''}`
+    `${maintenance.TipoActivo ?? ''} ${maintenance.CodigoInventario ?? ''} ${maintenance.Placa ?? ''} ${maintenance.EmpresaNombre ?? ''} ${maintenance.AgenciaNombre ?? ''} ${maintenance.FechaLimite ?? ''}`
       .toLocaleLowerCase()
       .includes(searchTerm.toLocaleLowerCase())
+    && (!maintenanceAgencyFilter || (maintenance.AgenciaNombre || 'Sin agencia asignada') === maintenanceAgencyFilter)
   ));
+  const exportFilteredMaintenance = () => {
+    const rows = filteredMantenimientos.map((maintenance) => ({
+      Activo: maintenance.TipoActivo ?? '',
+      CodigoInventario: maintenance.CodigoInventario ?? '',
+      Placa: maintenance.Placa ?? '',
+      Empresa: maintenance.EmpresaNombre ?? '',
+      Agencia: maintenance.AgenciaNombre || 'Sin agencia asignada',
+      Periodo: `Ciclo ${maintenance.Semestre} - ${maintenance.Anio}`,
+      FechaProgramada: maintenance.FechaLimite ?? '',
+    }));
+    const date = new Date().toISOString().slice(0, 10);
+    downloadRowsAsXlsx(rows, `mantenimientos_pendientes_${date}`);
+  };
+  const maintenanceAgencies = [...new Set(mantenimientos.map((maintenance) => maintenance.AgenciaNombre || 'Sin agencia asignada'))]
+    .sort((left, right) => left.localeCompare(right));
   const filteredLicencias = licencias.filter((license) => (
     [
       license.Nombre, license.Tipo, license.EmpresaNombre, license.RolNombre,
@@ -216,6 +311,7 @@ const GestionPage = () => {
     setAssigningActivo(activo);
     setSelectedUser('');
     setUserSearch('');
+    setAssignmentObservation('');
     try {
       const response = await gestionAPI.getAssignableUsers();
       setUsers(response.data?.data ?? []);
@@ -230,7 +326,11 @@ const GestionPage = () => {
     setSavingAssignment(true);
     setActionError('');
     try {
-      const response = await gestionAPI.assignActivo(assigningActivo.Id, Number(selectedUser));
+      const response = await gestionAPI.assignActivo(
+        assigningActivo.Id,
+        Number(selectedUser),
+        assignmentObservation.trim()
+      );
       setActionMessage(response.data?.message || 'Activo asignado correctamente.');
       setAssigningActivo(null);
       await loadData();
@@ -322,22 +422,6 @@ const GestionPage = () => {
     setShowCreateForm(true);
   };
 
-  const handleCreateSupplier = async () => {
-    setActionError('');
-    setAddingSupplier(true);
-    try {
-      const response = await gestionAPI.createProveedor({ Nombre: newSupplierName.trim() });
-      const suppliersResponse = await gestionAPI.getProveedores();
-      setProveedores(suppliersResponse.data?.data ?? []);
-      setAssetForm((current) => ({ ...current, ProveedorId: String(response.data?.data?.Id ?? '') }));
-      setNewSupplierName('');
-    } catch (error) {
-      setActionError(error.response?.data?.message || 'No se pudo agregar el proveedor.');
-    } finally {
-      setAddingSupplier(false);
-    }
-  };
-
   const handleCompleteMaintenance = async (event) => {
     event.preventDefault();
     if (!selectedMaintenance) return;
@@ -347,6 +431,7 @@ const GestionPage = () => {
       await gestionAPI.completarMantenimiento(selectedMaintenance.ActivoId, selectedMaintenance.Anio, selectedMaintenance.Semestre, {
         Ejecutor: maintenanceForm.Ejecutor,
         ProveedorId: maintenanceForm.Ejecutor === 'proveedor' ? Number(maintenanceForm.ProveedorId) : null,
+        FechaProgramada: selectedMaintenance.FechaLimite,
       });
       setSelectedMaintenance(null);
       await loadData();
@@ -413,7 +498,7 @@ const GestionPage = () => {
     setIncidentError('');
     const body = new FormData();
     body.append('CategoriaId', String(Number(incidentForm.CategoriaId)));
-    body.append('Prioridad', incidentForm.Prioridad);
+    if (incidentForm.Subcategoria) body.append('Subcategoria', incidentForm.Subcategoria);
     body.append('Titulo', incidentForm.Titulo.trim());
     body.append('Descripcion', incidentForm.Descripcion.trim());
     if (incidentContext.Empresas.length > 1) body.append('EmpresaId', incidentForm.EmpresaId);
@@ -426,7 +511,6 @@ const GestionPage = () => {
         Titulo: '',
         Descripcion: '',
         EmpresaId: incidentContext.Empresas.length === 1 ? String(incidentContext.Empresas[0].Id) : '',
-        Prioridad: 'media',
         Adjunto: null,
       }));
       setShowIncidentForm(false);
@@ -533,6 +617,23 @@ const GestionPage = () => {
     cerrada: 'bg-slate-100 text-slate-700 border-slate-200',
   }[status] || 'bg-slate-50 text-slate-600 border-slate-200');
 
+  const isIncidentOverdue = (incident) => {
+    if (!incident.FechaVencimiento || incident.FechaResolucion || incident.Estado === 'cerrada') return false;
+    const dueTime = Date.parse(String(incident.FechaVencimiento).replace(' ', 'T'));
+    return Number.isFinite(dueTime) && dueTime < Date.now();
+  };
+
+  const formatIncidentDeadline = (value) => {
+    if (!value) return 'Sin fecha límite';
+    const deadline = new Date(String(value).replace(' ', 'T'));
+    return Number.isNaN(deadline.getTime()) ? 'Sin fecha límite' : deadline.toLocaleString();
+  };
+
+  const getIncidentStatusLabel = (incident) => {
+    if (incident.Estado === 'pendiente' && incident.FechaResolucion) return 'pendiente por cerrar';
+    return String(incident.Estado ?? '').replace('_', ' ');
+  };
+
   const getIncidentPriorityStyle = (priority) => ({
     baja: 'bg-green-50 text-green-700',
     media: 'bg-yellow-50 text-yellow-700',
@@ -542,7 +643,7 @@ const GestionPage = () => {
 
   const filteredIncidencias = incidencias.filter((incident) => {
     const query = searchTerm.toLowerCase();
-    const matchesSearch = [incident.Ticket, incident.Titulo, incident.SolicitanteNombre, incident.SolicitanteApellidos]
+    const matchesSearch = [incident.Ticket, incident.Titulo, incident.SolicitanteNombre, incident.SolicitanteApellidos, incident.Subcategoria]
       .some((value) => (value ?? '').toLowerCase().includes(query));
     return matchesSearch && (incidentStatusFilter === 'todas' || incident.Estado === incidentStatusFilter);
   });
@@ -553,14 +654,46 @@ const GestionPage = () => {
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <h2 className="text-2xl font-bold text-slate-800">Activos Tecnológicos</h2>
-        {canManageAssets && <button onClick={() => { setActionError(''); setEditingAsset(null); setShowCreateForm(true); }} disabled={categorias.length === 0} className="inline-flex items-center gap-2 rounded-xl bg-green-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-green-700 disabled:cursor-not-allowed disabled:opacity-50">
-          <Plus size={16} /> Nuevo Activo
-        </button>}
+        <div className="flex flex-wrap gap-2">
+          <button type="button" onClick={exportFilteredAssets} disabled={filteredActivos.length === 0} className="inline-flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-2.5 text-sm font-semibold text-emerald-700 hover:bg-emerald-100 disabled:cursor-not-allowed disabled:opacity-50">
+            <Download size={16} /> Exportar Excel ({filteredActivos.length})
+          </button>
+          {canManageAssets && <button onClick={() => { setActionError(''); setEditingAsset(null); setShowCreateForm(true); }} disabled={categorias.length === 0} className="inline-flex items-center gap-2 rounded-xl bg-green-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-green-700 disabled:cursor-not-allowed disabled:opacity-50">
+            <Plus size={16} /> Nuevo Activo
+          </button>}
+        </div>
       </div>
       {loadError && <div role="alert" className="mb-6 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{loadError}</div>}
 
       {actionError && <div role="alert" className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{actionError}</div>}
       {actionMessage && <div role="status" className="rounded-xl border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-700">{actionMessage}</div>}
+
+      <div className="grid gap-4 rounded-2xl border border-slate-200 bg-white p-4 sm:grid-cols-2">
+        <label className="text-sm font-semibold text-slate-700">
+          Usuario asignado
+          <select
+            value={assetUserFilter}
+            onChange={(event) => setAssetUserFilter(event.target.value)}
+            className="mt-2 w-full rounded-xl border border-slate-200 bg-white px-4 py-3 font-normal"
+          >
+            <option value="">Todos los usuarios</option>
+            {assetAssignees.map((assignee) => (
+              <option key={assignee.Id} value={assignee.Id}>{assignee.Nombre}</option>
+            ))}
+          </select>
+        </label>
+        <label className="text-sm font-semibold text-slate-700">
+          Agencia / lugar del usuario asignado
+          <select
+            value={assetLocationFilter}
+            onChange={(event) => setAssetLocationFilter(event.target.value)}
+            className="mt-2 w-full rounded-xl border border-slate-200 bg-white px-4 py-3 font-normal"
+          >
+            <option value="">Todos los lugares</option>
+            {assetLocations.map((location) => <option key={location} value={location}>{location}</option>)}
+          </select>
+        </label>
+      </div>
 
       {filteredActivos.length === 0 ? (
         <div className="rounded-2xl border border-slate-200 bg-white p-12 text-center text-slate-500">
@@ -602,6 +735,16 @@ const GestionPage = () => {
                 <User size={14} />
                 <span>{activo.AsignadoNombre ? `${activo.AsignadoNombre} ${activo.AsignadoApellidos}` : 'Sin asignar'}</span>
               </div>
+              {activo.AsignadoA && (
+                <div className="flex items-center gap-2">
+                  <UserPlus size={14} />
+                  <span>Asignado por: {activo.AsignadoPorNombre ? `${activo.AsignadoPorNombre} ${activo.AsignadoPorApellidos ?? ''}`.trim() : 'No registrado'}</span>
+                </div>
+              )}
+              <div className="flex items-center gap-2">
+                <Building2 size={14} />
+                <span>Agencia: {activo.UbicacionAsignado || '-'}</span>
+              </div>
               <div className="flex items-center gap-2">
                 <Building2 size={14} />
                 <span>{activo.EmpresaNombre || 'Empresa sin asignar'}</span>
@@ -611,14 +754,15 @@ const GestionPage = () => {
               <div><span className="font-semibold">Proveedor:</span> {activo.ProveedorNombre || '-'}</div>
               <div className="flex items-center gap-2">
                 <Calendar size={14} />
-                <span>Inicio: {activo.FechaInicio ? new Date(`${activo.FechaInicio}T00:00:00`).toLocaleDateString() : '-'}</span>
+                <span>{activo.TipoPropiedad === 'arriendo' ? 'Inicio contrato' : 'Fecha de compra'}: {activo.FechaInicio ? new Date(`${activo.FechaInicio}T00:00:00`).toLocaleDateString() : '-'}</span>
               </div>
               <div className="flex items-center gap-2">
                 <Calendar size={14} />
-                <span>Fin garantía/contrato: {activo.FechaFin ? new Date(`${activo.FechaFin}T00:00:00`).toLocaleDateString() : '-'}</span>
+                <span>{activo.TipoPropiedad === 'arriendo' ? 'Fin contrato' : 'Fin de garantía'}: {activo.FechaFin ? new Date(`${activo.FechaFin}T00:00:00`).toLocaleDateString() : '-'}</span>
               </div>
-              <div><span className="font-semibold">Factura / contrato:</span> {activo.NumeroFacturaContrato || '-'}</div>
+              <div><span className="font-semibold">{activo.TipoPropiedad === 'arriendo' ? 'Número de contrato' : 'Número de factura'}:</span> {activo.NumeroFacturaContrato || '-'}</div>
               {activo.Observaciones && <div className="border-t border-slate-100 pt-2"><span className="font-semibold">Observaciones:</span> {activo.Observaciones}</div>}
+              {activo.ObservacionAsignacion && <div className="border-t border-slate-100 pt-2"><span className="font-semibold">Observación de entrega:</span> {activo.ObservacionAsignacion}</div>}
             </div>
 
             {canManageAssets && activo.EstadoActivo !== 'retirado' && (
@@ -649,12 +793,22 @@ const GestionPage = () => {
 
   const renderMantenimiento = () => (
     <div className="space-y-6">
-      <div className="flex justify-between items-center">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h2 className="text-2xl font-bold text-slate-800">Mantenimientos pendientes</h2>
-          <p className="mt-1 text-sm text-slate-600">Períodos semestrales pendientes desde la compra o inicio del contrato de cada activo.</p>
+          <p className="mt-1 text-sm text-slate-600">Mantenimientos de activos propios cada seis meses, comenzando seis meses después del vencimiento de la garantía.</p>
         </div>
+        <button type="button" onClick={exportFilteredMaintenance} disabled={filteredMantenimientos.length === 0} className="inline-flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-2.5 text-sm font-semibold text-emerald-700 hover:bg-emerald-100 disabled:cursor-not-allowed disabled:opacity-50">
+          <Download size={16} /> Exportar Excel ({filteredMantenimientos.length})
+        </button>
       </div>
+      <label className="block max-w-md rounded-2xl border border-slate-200 bg-white p-4 text-sm font-semibold text-slate-700">
+        Filtrar por agencia
+        <select value={maintenanceAgencyFilter} onChange={(event) => setMaintenanceAgencyFilter(event.target.value)} className="mt-2 w-full rounded-xl border border-slate-200 bg-white px-4 py-3 font-normal">
+          <option value="">Todas las agencias</option>
+          {maintenanceAgencies.map((agency) => <option key={agency} value={agency}>{agency}</option>)}
+        </select>
+      </label>
       {actionError && <div role="alert" className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{actionError}</div>}
       {filteredMantenimientos.length === 0 ? (
         <div className="rounded-2xl border border-slate-200 bg-white p-12 text-center text-slate-500">
@@ -662,25 +816,27 @@ const GestionPage = () => {
         </div>
       ) : (
         <div className="overflow-x-auto rounded-2xl border border-slate-200 bg-white">
-          <table className="w-full min-w-[700px]">
+          <table className="w-full min-w-[850px]">
             <thead className="bg-slate-50">
               <tr>
                 <th className="px-5 py-3 text-left text-xs font-semibold text-slate-600">Activo</th>
                 <th className="px-5 py-3 text-left text-xs font-semibold text-slate-600">Empresa</th>
+                <th className="px-5 py-3 text-left text-xs font-semibold text-slate-600">Agencia asignada</th>
                 <th className="px-5 py-3 text-left text-xs font-semibold text-slate-600">Período</th>
-                <th className="px-5 py-3 text-left text-xs font-semibold text-slate-600">Fecha límite</th>
+                <th className="px-5 py-3 text-left text-xs font-semibold text-slate-600">Fecha programada</th>
                 {canManageMaintenance && <th className="px-5 py-3 text-left text-xs font-semibold text-slate-600">Acción</th>}
               </tr>
             </thead>
             <tbody>
               {filteredMantenimientos.map((maintenance) => (
-                <tr key={`${maintenance.ActivoId}-${maintenance.Anio}-${maintenance.Semestre}`} className="border-t border-slate-100">
+                <tr key={`${maintenance.ActivoId}-${maintenance.FechaLimite}`} className="border-t border-slate-100">
                   <td className="px-5 py-4">
                     <div className="font-semibold text-slate-800">{maintenance.TipoActivo || 'Activo tecnológico'}</div>
                     <div className="text-xs font-mono text-slate-500">{maintenance.CodigoInventario}{maintenance.Placa ? ` · ${maintenance.Placa}` : ''}</div>
                   </td>
                   <td className="px-5 py-4 text-sm text-slate-600">{maintenance.EmpresaNombre || '-'}</td>
-                  <td className="px-5 py-4 text-sm text-slate-600">Semestre {maintenance.Semestre} · {maintenance.Anio}</td>
+                  <td className="px-5 py-4 text-sm text-slate-600">{maintenance.AgenciaNombre || 'Sin agencia asignada'}</td>
+                  <td className="px-5 py-4 text-sm text-slate-600">Ciclo {maintenance.Semestre} · {maintenance.Anio}</td>
                   <td className="px-5 py-4 text-sm text-slate-600">{new Date(`${maintenance.FechaLimite}T00:00:00`).toLocaleDateString()}</td>
                   {canManageMaintenance && (
                     <td className="px-5 py-4">
@@ -733,25 +889,36 @@ const GestionPage = () => {
               <select
                 required
                 value={incidentForm.CategoriaId}
-                onChange={(event) => setIncidentForm({ ...incidentForm, CategoriaId: event.target.value })}
+                onChange={(event) => setIncidentForm({ ...incidentForm, CategoriaId: event.target.value, Subcategoria: '' })}
                 className="mt-2 w-full rounded-xl border border-slate-200 bg-white px-4 py-3"
               >
                 {categoriasIncidencias.map((category) => <option key={category.Id} value={category.Id}>{category.Nombre}</option>)}
               </select>
             </label>
-            <label className="text-sm font-semibold text-slate-700">
-              Prioridad
-              <select
-                value={incidentForm.Prioridad}
-                onChange={(event) => setIncidentForm({ ...incidentForm, Prioridad: event.target.value })}
-                className="mt-2 w-full rounded-xl border border-slate-200 bg-white px-4 py-3"
-              >
-                <option value="baja">Baja</option>
-                <option value="media">Media</option>
-                <option value="alta">Alta</option>
-                <option value="critica">Crítica</option>
-              </select>
-            </label>
+            {categoriasIncidencias.find((category) => String(category.Id) === incidentForm.CategoriaId)?.Subcategorias?.length > 0 && (
+              <label className="text-sm font-semibold text-slate-700">
+                Subcategoría <span className="text-red-600">*</span>
+                <select
+                  required
+                  value={incidentForm.Subcategoria}
+                  onChange={(event) => setIncidentForm({ ...incidentForm, Subcategoria: event.target.value })}
+                  className="mt-2 w-full rounded-xl border border-slate-200 bg-white px-4 py-3"
+                >
+                  <option value="">Selecciona una subcategoría</option>
+                  {categoriasIncidencias
+                    .find((category) => String(category.Id) === incidentForm.CategoriaId)
+                    .Subcategorias.map((subcategory) => (
+                      <option key={subcategory} value={subcategory}>{subcategory}</option>
+                    ))}
+                </select>
+              </label>
+            )}
+            <div className="text-sm font-semibold text-slate-700">
+              Prioridad inicial
+              <p className="mt-2 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 font-normal text-emerald-800">
+                Baja automáticamente (tiempo estimado de solución: {incidentPriorityResponseTimes.baja}).
+              </p>
+            </div>
             <label className="text-sm font-semibold text-slate-700 sm:col-span-2">
               Título <span className="text-red-600">*</span>
               <input
@@ -842,7 +1009,7 @@ const GestionPage = () => {
       </div>
 
       <div className="overflow-x-auto rounded-2xl border border-slate-200 bg-white">
-        <table className="w-full min-w-[760px]">
+        <table className="w-full min-w-[900px]">
           <thead className="bg-slate-50">
             <tr>
               <th className="px-5 py-3 text-left text-xs font-semibold text-slate-600">Ticket</th>
@@ -851,23 +1018,31 @@ const GestionPage = () => {
               <th className="px-5 py-3 text-left text-xs font-semibold text-slate-600">Estado</th>
               <th className="px-5 py-3 text-left text-xs font-semibold text-slate-600">Solicitante</th>
               <th className="px-5 py-3 text-left text-xs font-semibold text-slate-600">Fecha</th>
+              <th className="px-5 py-3 text-left text-xs font-semibold text-slate-600">Fecha límite</th>
               <th className="px-5 py-3 text-left text-xs font-semibold text-slate-600">Seguimiento</th>
             </tr>
           </thead>
           <tbody>
             {filteredIncidencias.map((incident) => (
-              <tr key={incident.Id} className="border-t border-slate-100 hover:bg-slate-50">
+              <tr key={incident.Id} className={`border-t border-slate-100 ${isIncidentOverdue(incident) ? 'bg-red-50/70' : 'hover:bg-slate-50'}`}>
                 <td className="px-5 py-4 font-mono text-sm font-semibold text-green-700">{incident.Ticket}</td>
                 <td className="px-5 py-4">
                   <button onClick={() => openIncident(incident)} className="text-left">
                     <div className="font-semibold text-slate-800 hover:text-green-700">{incident.Titulo}</div>
-                    <div className="mt-1 text-xs text-slate-500">{incident.CategoriaNombre}{incident.Ubicacion ? ` · ${incident.Ubicacion}` : ''}{incident.EmpresaNombre ? ` · ${incident.EmpresaNombre}` : ''}</div>
+                    <div className="mt-1 text-xs text-slate-500">{incident.CategoriaNombre}{incident.Subcategoria ? ` · ${incident.Subcategoria}` : ''}{incident.Ubicacion ? ` · ${incident.Ubicacion}` : ''}{incident.EmpresaNombre ? ` · ${incident.EmpresaNombre}` : ''}</div>
                   </button>
                 </td>
-                <td className="px-5 py-4"><span className={`rounded-full px-3 py-1 text-xs font-semibold ${getIncidentPriorityStyle(incident.Prioridad)}`}>{incident.Prioridad}</span></td>
-                <td className="px-5 py-4"><span className={`rounded-full border px-3 py-1 text-xs font-semibold ${getIncidentStatusStyle(incident.Estado)}`}>{incident.Estado.replace('_', ' ')}</span></td>
+                <td className="px-5 py-4">
+                  <span className={`rounded-full px-3 py-1 text-xs font-semibold ${isIncidentOverdue(incident) ? 'bg-red-100 text-red-800' : getIncidentPriorityStyle(incident.Prioridad)}`}>{incident.Prioridad}</span>
+                  <div className="mt-1 text-xs text-slate-500">Respuesta: {incidentPriorityResponseTimes[incident.Prioridad] ?? '-'}</div>
+                </td>
+                <td className="px-5 py-4"><span className={`rounded-full border px-3 py-1 text-xs font-semibold ${getIncidentStatusStyle(incident.Estado)}`}>{getIncidentStatusLabel(incident)}</span></td>
                 <td className="px-5 py-4 text-sm text-slate-600">{incident.SolicitanteNombre} {incident.SolicitanteApellidos}</td>
                 <td className="px-5 py-4 text-sm text-slate-600">{new Date(incident.FechaCreacion).toLocaleDateString()}</td>
+                <td className={`px-5 py-4 text-sm ${isIncidentOverdue(incident) ? 'font-semibold text-red-700' : 'text-slate-600'}`}>
+                  {formatIncidentDeadline(incident.FechaVencimiento)}
+                  {isIncidentOverdue(incident) && <div className="mt-1 text-xs font-bold uppercase">Vencido</div>}
+                </td>
                 <td className="px-5 py-4">
                   <button onClick={() => openIncident(incident)} className="inline-flex items-center gap-1 rounded-lg bg-blue-50 px-3 py-2 text-xs font-semibold text-blue-700 hover:bg-blue-100">
                     <MessageSquare size={14} /> {incident.Seguimientos ?? 0}
@@ -876,7 +1051,7 @@ const GestionPage = () => {
               </tr>
             ))}
             {filteredIncidencias.length === 0 && (
-              <tr><td colSpan="7" className="px-5 py-12 text-center text-slate-500">No hay tickets que coincidan con la búsqueda o el estado seleccionado.</td></tr>
+              <tr><td colSpan="8" className="px-5 py-12 text-center text-slate-500">No hay tickets que coincidan con la búsqueda o el estado seleccionado.</td></tr>
             )}
           </tbody>
         </table>
@@ -1105,6 +1280,17 @@ const GestionPage = () => {
               )}
               {selectedUser && <p className="mt-2 text-xs text-green-700">Usuario seleccionado. La asignación se completará después de su aceptación.</p>}
             </div>
+            <label className="block text-sm font-semibold text-slate-700">
+              Comentario sobre el estado del activo u observaciones
+              <textarea
+                rows={3}
+                maxLength={5000}
+                value={assignmentObservation}
+                onChange={(event) => setAssignmentObservation(event.target.value)}
+                placeholder="Describe el estado del equipo o alguna observación para la entrega."
+                className="mt-2 w-full resize-y rounded-xl border border-slate-200 px-4 py-3 font-normal"
+              />
+            </label>
             {users.length === 0 && <p className="text-sm text-amber-700">No hay usuarios activos disponibles para asignar.</p>}
             <div className="flex justify-end gap-3">
               <button type="button" onClick={() => setAssigningActivo(null)} className="rounded-xl border border-slate-200 px-4 py-2.5 font-semibold text-slate-700 hover:bg-slate-50">Cancelar</button>
@@ -1133,9 +1319,15 @@ const GestionPage = () => {
                 </select>
               </div>
               <label className="text-sm font-semibold text-slate-700">Empresa *
-                <select required value={assetForm.EmpresaId} onChange={(event) => setAssetForm({ ...assetForm, EmpresaId: event.target.value })} className="mt-2 w-full rounded-xl border border-slate-200 bg-white px-4 py-3">
-                  {empresas.map((company) => <option key={company.Id} value={company.Id}>{company.Nombre}</option>)}
-                </select>
+                {empresas.length > 1 ? (
+                  <select required value={assetForm.EmpresaId} onChange={(event) => setAssetForm({ ...assetForm, EmpresaId: event.target.value })} className="mt-2 w-full rounded-xl border border-slate-200 bg-white px-4 py-3">
+                    {empresas.map((company) => <option key={company.Id} value={company.Id}>{company.Nombre}</option>)}
+                  </select>
+                ) : (
+                  <p className={`mt-2 rounded-xl border px-4 py-3 font-normal ${empresas.length === 1 ? 'border-slate-200 bg-slate-50' : 'border-amber-200 bg-amber-50 text-amber-800'}`}>
+                    {empresas[0]?.Nombre ?? 'No tienes una empresa asignada para registrar activos.'}
+                  </p>
+                )}
               </label>
               <label className="text-sm font-semibold text-slate-700">Tipo de propiedad *
                 <select required value={assetForm.TipoPropiedad} onChange={(event) => setAssetForm({ ...assetForm, TipoPropiedad: event.target.value })} className="mt-2 w-full rounded-xl border border-slate-200 bg-white px-4 py-3">
@@ -1148,20 +1340,17 @@ const GestionPage = () => {
                   <option value="">Sin proveedor</option>
                   {proveedores.map((provider) => <option key={provider.Id} value={provider.Id}>{provider.Nombre}</option>)}
                 </select>
-                {canManageAssets && (
-                  <div className="mt-2">
-                    <input maxLength={255} value={newSupplierName} onChange={(event) => setNewSupplierName(event.target.value)} placeholder="Agregar tienda o proveedor" className="w-full rounded-xl border border-slate-200 px-4 py-2.5 font-normal" />
-                    <button type="button" onClick={handleCreateSupplier} disabled={addingSupplier || !newSupplierName.trim()} className="mt-2 text-xs font-semibold text-green-700 hover:text-green-800 disabled:opacity-50">{addingSupplier ? 'Agregando...' : '+ Agregar proveedor al listado'}</button>
-                  </div>
-                )}
               </label>
-              <label className="text-sm font-semibold text-slate-700">Número de factura o contrato
+              <label className="text-sm font-semibold text-slate-700">
+                {assetForm.TipoPropiedad === 'arriendo' ? 'Número de contrato' : 'Número de factura'}
                 <input maxLength={150} value={assetForm.NumeroFacturaContrato} onChange={(event) => setAssetForm({ ...assetForm, NumeroFacturaContrato: event.target.value })} className="mt-2 w-full rounded-xl border border-slate-200 px-4 py-3 font-normal" />
               </label>
-              <label className="text-sm font-semibold text-slate-700">Fecha de compra o inicio del contrato
+              <label className="text-sm font-semibold text-slate-700">
+                {assetForm.TipoPropiedad === 'arriendo' ? 'Inicio contrato' : 'Fecha de compra'}
                 <input type="date" value={assetForm.FechaInicio} onChange={(event) => setAssetForm({ ...assetForm, FechaInicio: event.target.value })} className="mt-2 w-full rounded-xl border border-slate-200 px-4 py-3 font-normal" />
               </label>
-              <label className="text-sm font-semibold text-slate-700">Fecha fin de garantía o contrato
+              <label className="text-sm font-semibold text-slate-700">
+                {assetForm.TipoPropiedad === 'arriendo' ? 'Fin contrato' : 'Fecha fin de garantía'}
                 <input type="date" value={assetForm.FechaFin} onChange={(event) => setAssetForm({ ...assetForm, FechaFin: event.target.value })} className="mt-2 w-full rounded-xl border border-slate-200 px-4 py-3 font-normal" />
               </label>
               <label className="text-sm font-semibold text-slate-700">Placa
@@ -1232,7 +1421,7 @@ const GestionPage = () => {
             <div className="flex items-start justify-between gap-4">
               <div>
                 <h2 id="create-license-title" className="text-xl font-bold text-slate-800">{editingLicenseId ? 'Renovar / actualizar licencia' : 'Registrar licencia de software'}</h2>
-                <p className="mt-1 text-sm text-slate-600">{editingLicenseId ? 'Actualiza sus datos de vigencia, proveedor, cantidad y activos asociados.' : 'Asocia la licencia a una empresa, un área y uno o más activos.'}</p>
+                <p className="mt-1 text-sm text-slate-600">{editingLicenseId ? 'Actualiza sus datos de vigencia, proveedor, cantidad y activos asociados.' : 'Asocia la licencia a una empresa y un área; vincular activos es opcional.'}</p>
               </div>
               <button type="button" disabled={licenseSaving} onClick={() => setShowLicenseForm(false)} aria-label="Cerrar" className="rounded-lg p-2 text-slate-500 hover:bg-slate-100"><X size={18} /></button>
             </div>
@@ -1249,13 +1438,19 @@ const GestionPage = () => {
                 </select>
               </label>
               <label className="text-sm font-semibold text-slate-700">Empresa *
-                <select required value={licenseForm.EmpresaId} onChange={(event) => setLicenseForm((current) => ({
-                  ...current,
-                  EmpresaId: event.target.value,
-                  ActivosIds: current.ActivosIds.filter((id) => licenseOptions.Activos.some((asset) => String(asset.Id) === id && String(asset.EmpresaId) === event.target.value)),
-                }))} className="mt-2 w-full rounded-xl border border-slate-200 bg-white px-4 py-3 font-normal">
-                  {licenseOptions.Empresas.map((company) => <option key={company.Id} value={company.Id}>{company.Nombre}</option>)}
-                </select>
+                {licenseOptions.Empresas.length > 1 ? (
+                  <select required value={licenseForm.EmpresaId} onChange={(event) => setLicenseForm((current) => ({
+                    ...current,
+                    EmpresaId: event.target.value,
+                    ActivosIds: current.ActivosIds.filter((id) => licenseOptions.Activos.some((asset) => String(asset.Id) === id && String(asset.EmpresaId) === event.target.value)),
+                  }))} className="mt-2 w-full rounded-xl border border-slate-200 bg-white px-4 py-3 font-normal">
+                    {licenseOptions.Empresas.map((company) => <option key={company.Id} value={company.Id}>{company.Nombre}</option>)}
+                  </select>
+                ) : (
+                  <p className={`mt-2 rounded-xl border px-4 py-3 font-normal ${licenseOptions.Empresas.length === 1 ? 'border-slate-200 bg-slate-50' : 'border-amber-200 bg-amber-50 text-amber-800'}`}>
+                    {licenseOptions.Empresas[0]?.Nombre ?? 'No tienes una empresa asignada para registrar licencias.'}
+                  </p>
+                )}
               </label>
               <label className="text-sm font-semibold text-slate-700">Rol *
                 <select required value={licenseForm.RolId} onChange={(event) => setLicenseForm({ ...licenseForm, RolId: event.target.value })} className="mt-2 w-full rounded-xl border border-slate-200 bg-white px-4 py-3 font-normal">
@@ -1275,7 +1470,7 @@ const GestionPage = () => {
                 <input type="date" value={licenseForm.FechaVencimiento} onChange={(event) => setLicenseForm({ ...licenseForm, FechaVencimiento: event.target.value })} className="mt-2 w-full rounded-xl border border-slate-200 px-4 py-3 font-normal" />
               </label>
               <fieldset className="sm:col-span-2">
-                <legend className="text-sm font-semibold text-slate-700">Activos asociados *</legend>
+                <legend className="text-sm font-semibold text-slate-700">Activos asociados (opcional)</legend>
                 <input
                   type="search"
                   value={licenseAssetSearch}
@@ -1305,8 +1500,13 @@ const GestionPage = () => {
                   ))}
                   {licenseOptions.Activos
                     .filter((asset) => String(asset.EmpresaId) === licenseForm.EmpresaId)
-                    .filter((asset) => `${asset.CodigoInventario} ${asset.TipoActivo} ${asset.Placa ?? ''}`.toLocaleLowerCase().includes(licenseAssetSearch.toLocaleLowerCase())).length === 0 && <p className="text-sm text-slate-500">No hay activos que coincidan con la búsqueda.</p>}
-                  {licenseOptions.Activos.filter((asset) => String(asset.EmpresaId) === licenseForm.EmpresaId).length === 0 && <p className="text-sm text-slate-500">No hay activos disponibles para esta empresa.</p>}
+                    .filter((asset) => `${asset.CodigoInventario} ${asset.TipoActivo} ${asset.Placa ?? ''}`.toLocaleLowerCase().includes(licenseAssetSearch.toLocaleLowerCase())).length === 0 && (
+                    <p className="text-sm text-slate-500">
+                      {licenseOptions.Activos.some((asset) => String(asset.EmpresaId) === licenseForm.EmpresaId)
+                        ? 'No hay activos que coincidan con la búsqueda.'
+                        : 'No hay activos para asociar; puedes guardar la licencia sin activos.'}
+                    </p>
+                  )}
                 </div>
               </fieldset>
               <label className="text-sm font-semibold text-slate-700 sm:col-span-2">Observaciones
@@ -1315,7 +1515,7 @@ const GestionPage = () => {
             </div>
             <div className="flex justify-end gap-3">
               <button type="button" disabled={licenseSaving} onClick={() => { setShowLicenseForm(false); setEditingLicenseId(null); }} className="rounded-xl border border-slate-200 px-4 py-2.5 font-semibold text-slate-700">Cancelar</button>
-              <button type="submit" disabled={licenseSaving || !licenseOptions.Activos.some((asset) => String(asset.EmpresaId) === licenseForm.EmpresaId) || !licenseForm.ActivosIds.length} className="rounded-xl bg-green-600 px-4 py-2.5 font-semibold text-white disabled:opacity-50">{licenseSaving ? 'Guardando...' : editingLicenseId ? 'Guardar renovación' : 'Registrar licencia'}</button>
+              <button type="submit" disabled={licenseSaving || !licenseOptions.Empresas.some((company) => String(company.Id) === licenseForm.EmpresaId)} className="rounded-xl bg-green-600 px-4 py-2.5 font-semibold text-white disabled:opacity-50">{licenseSaving ? 'Guardando...' : editingLicenseId ? 'Guardar renovación' : 'Registrar licencia'}</button>
             </div>
           </form>
         </div>
@@ -1341,6 +1541,12 @@ const GestionPage = () => {
                 <div className="mt-1 font-medium text-slate-800">{selectedIncident.SolicitanteNombre} {selectedIncident.SolicitanteApellidos}</div>
               </div>
               <div className="rounded-xl bg-slate-50 p-4">
+                <div className="text-xs font-semibold uppercase text-slate-500">Categoría</div>
+                <div className="mt-1 font-medium text-slate-800">
+                  {selectedIncident.CategoriaNombre}{selectedIncident.Subcategoria ? ` · ${selectedIncident.Subcategoria}` : ''}
+                </div>
+              </div>
+              <div className="rounded-xl bg-slate-50 p-4">
                 <div className="text-xs font-semibold uppercase text-slate-500">Ubicación</div>
                 <div className="mt-1 font-medium text-slate-800">{selectedIncident.Ubicacion || 'No indicada'}</div>
               </div>
@@ -1354,6 +1560,13 @@ const GestionPage = () => {
                 <div className="mb-1 text-sm font-semibold text-slate-700">Descripción del problema</div>
                 <p className="whitespace-pre-wrap text-sm text-slate-600">{selectedIncident.Descripcion}</p>
               </div>
+            </div>
+            <div className={`rounded-xl border p-4 ${isIncidentOverdue(selectedIncident) ? 'border-red-300 bg-red-50' : 'border-slate-200 bg-slate-50'}`}>
+              <div className="text-xs font-semibold uppercase text-slate-500">Tiempo de respuesta estimado</div>
+              <div className="mt-1 font-medium text-slate-800">
+                {incidentPriorityResponseTimes[selectedIncident.Prioridad] ?? '-'} · fecha límite {formatIncidentDeadline(selectedIncident.FechaVencimiento)}
+              </div>
+              {isIncidentOverdue(selectedIncident) && <div className="mt-1 text-sm font-bold text-red-700">El tiempo de solución esperado venció.</div>}
             </div>
             {selectedIncident.ArchivoAdjunto && (
               <div>
@@ -1405,6 +1618,9 @@ const GestionPage = () => {
                       <option value="alta">Alta</option>
                       <option value="critica">Crítica</option>
                     </select>
+                    <span className="mt-1 block text-xs font-normal text-slate-500">
+                      Tiempo estimado: {incidentPriorityResponseTimes[selectedIncident.Prioridad] ?? '-'}
+                    </span>
                   </label>
                   <label className="text-sm font-medium text-slate-700 sm:col-span-2">
                     Comentario de seguimiento
@@ -1425,12 +1641,12 @@ const GestionPage = () => {
               </form>
             ) : (
               <div className="flex flex-wrap gap-3 border-t border-slate-100 pt-4 text-sm">
-                <span className={`rounded-full border px-3 py-1 font-semibold ${getIncidentStatusStyle(selectedIncident.Estado)}`}>{selectedIncident.Estado === 'pendiente' ? 'Pendiente por cerrar' : selectedIncident.Estado.replace('_', ' ')}</span>
+                <span className={`rounded-full border px-3 py-1 font-semibold ${getIncidentStatusStyle(selectedIncident.Estado)}`}>{getIncidentStatusLabel(selectedIncident)}</span>
                 <span className={`rounded-full px-3 py-1 font-semibold ${getIncidentPriorityStyle(selectedIncident.Prioridad)}`}>{selectedIncident.Prioridad}</span>
                 <span className="inline-flex items-center gap-1 text-slate-600"><User size={14} />{selectedIncident.AsignadoNombre ? `${selectedIncident.AsignadoNombre} ${selectedIncident.AsignadoApellidos}` : 'Sin asignar'}</span>
               </div>
             )}
-            {isIncidentRequester && selectedIncident.Estado === 'pendiente' && (
+            {isIncidentRequester && selectedIncident.Estado === 'pendiente' && selectedIncident.FechaResolucion && (
               <form onSubmit={handleCloseIncident} className="space-y-4 border-t border-slate-100 pt-4">
                 <div>
                   <h3 className="text-sm font-semibold text-slate-700">Encuesta de satisfacción</h3>

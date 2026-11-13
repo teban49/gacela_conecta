@@ -42,7 +42,7 @@ const GeneralTab = ({ rows }) => {
             {pie.length === 0 ? null : (
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
-                  <Pie data={pie} dataKey="value" nameKey="name" innerRadius={55} outerRadius={95} paddingAngle={2} label={({ value }) => `${value}`}>
+                  <Pie data={pie} dataKey="value" nameKey="name" innerRadius={55} outerRadius={95} paddingAngle={2} label={({ value }) => `${value}`} animationDuration={1000}>
                     {pie.map((item) => <Cell key={item.name} fill={item.color} />)}
                   </Pie>
                   <Tooltip formatter={(value) => `${value} min`} />
@@ -65,13 +65,14 @@ const GeneralTab = ({ rows }) => {
               <YAxis />
               <Tooltip formatter={(value) => `${value} min`} />
               <Legend verticalAlign="top" />
-              <Bar dataKey="favor" name="A favor" fill={COLORS.favor} radius={[6, 6, 0, 0]} />
-              <Bar dataKey="contra" name="En contra" fill={COLORS.contra} radius={[6, 6, 0, 0]} />
+              <Bar dataKey="favor" name="A favor" fill={COLORS.favor} radius={[6, 6, 0, 0]} animationDuration={1000} />
+              <Bar dataKey="contra" name="En contra" fill={COLORS.contra} radius={[6, 6, 0, 0]} animationDuration={1000} />
             </BarChart>
           </ResponsiveContainer>
         </div>
         <div className="mt-4">
           <Table
+            fileName="minutos_por_area"
             rows={areas.map((area) => ({ ...area, key: area.area }))}
             columns={[
               { key: 'area', label: 'Área' },

@@ -2,9 +2,13 @@ import { useAuth } from "../../../contexts/AuthContext";
 import { LogOut, UserCircle2 } from "lucide-react";
 import ThemeToggle from "../../../components/ThemeToggle";
 import NotificationBell from "../../../components/NotificationBell";
+import { useTheme } from "../../../contexts/ThemeContext";
+import lightLogo from "../../../assets/images/logo-gacela.png";
+import darkLogo from "../../../assets/images/logo-gacela-dark.png";
 
 const DashboardHeader = () => {
     const { user, logout } = useAuth();
+    const { isDark } = useTheme();
 
     const handleLogout = () => {
         logout();
@@ -23,9 +27,9 @@ const DashboardHeader = () => {
                 <div className="flex items-center gap-4">
 
                     <img
-                        src="/src/assets/images/logo-gacela.png"
+                        src={isDark ? darkLogo : lightLogo}
                         alt="Gacela Conecta"
-                        className="h-12 w-auto"
+                        className="h-12 w-auto object-contain"
                     />
 
                     <div>

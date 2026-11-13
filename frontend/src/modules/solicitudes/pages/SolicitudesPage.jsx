@@ -427,14 +427,20 @@ const SolicitudesPage = () => {
           <>
             <label className="text-sm font-semibold text-slate-700">
               Empresa <span className="text-red-600">*</span>
-              <select
-                required
-                value={formData.EmpresaId}
-                onChange={(event) => setFormData({ ...formData, EmpresaId: event.target.value })}
-                className="mt-2 w-full rounded-xl border border-slate-200 bg-white px-4 py-3"
-              >
-                {companies.map((company) => <option key={company.Id} value={company.Id}>{company.Nombre}</option>)}
-              </select>
+              {companies.length > 1 ? (
+                <select
+                  required
+                  value={formData.EmpresaId}
+                  onChange={(event) => setFormData({ ...formData, EmpresaId: event.target.value })}
+                  className="mt-2 w-full rounded-xl border border-slate-200 bg-white px-4 py-3"
+                >
+                  {companies.map((company) => <option key={company.Id} value={company.Id}>{company.Nombre}</option>)}
+                </select>
+              ) : (
+                <p className={`mt-2 rounded-xl border px-4 py-3 font-normal ${companies.length === 1 ? 'border-slate-200 bg-slate-50' : 'border-amber-200 bg-amber-50 text-amber-800'}`}>
+                  {companies[0]?.Nombre ?? 'No tienes una empresa asignada para esta solicitud.'}
+                </p>
+              )}
             </label>
             <label className="text-sm font-semibold text-slate-700">
               Cédula de ciudadanía
@@ -511,7 +517,7 @@ const SolicitudesPage = () => {
       <div className="flex justify-end">
         <button
           type="submit"
-          disabled={saving || types.length === 0}
+          disabled={saving || types.length === 0 || (activeType?.Codigo === 'vacaciones' && companies.length === 0)}
           className="inline-flex items-center gap-2 rounded-xl bg-orange-600 px-5 py-3 font-semibold text-white hover:bg-orange-700 disabled:opacity-50"
         >
           <Send size={16} />

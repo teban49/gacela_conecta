@@ -4,9 +4,10 @@ import { CalendarX, Trophy, Users } from 'lucide-react';
 import { COLORS, Card, Empty, Kpi, Table } from '../components/HorarioParts';
 import { WEEKDAYS, formatDate, monthKey, monthLabel } from '../utils/horarioStats';
 
-const AbsencesTab = ({ absences, areas }) => {
+const AbsencesTab = ({ absences, areas, areaLimit = null }) => {
   const [area, setArea] = useState('');
-  const items = useMemo(() => absences.filter((item) => !area || item.area === area), [absences, area]);
+  const activeArea = areaLimit ?? area;
+  const items = useMemo(() => absences.filter((item) => !activeArea || item.area === activeArea), [absences, activeArea]);
 
   const months = useMemo(() => [...new Set(items.map((item) => monthKey(item.fecha)))].sort(), [items]);
 
@@ -35,8 +36,8 @@ const AbsencesTab = ({ absences, areas }) => {
     <div className="space-y-6">
       <Card>
         <label className="text-sm font-medium text-slate-600">Área
-          <select className="mt-1 w-full max-w-sm rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm sm:block" value={area} onChange={(e) => setArea(e.target.value)}>
-            <option value="">Todas las áreas</option>
+          <select className="mt-1 w-full max-w-sm rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm sm:block" value={activeArea} disabled={Boolean(areaLimit)} onChange={(e) => setArea(e.target.value)}>
+            {!areaLimit && <option value="">Todas las áreas</option>}
             {areas.map((item) => <option key={item} value={item}>{item}</option>)}
           </select>
         </label>
@@ -60,7 +61,7 @@ const AbsencesTab = ({ absences, areas }) => {
                     <XAxis dataKey="mes" />
                     <YAxis allowDecimals={false} />
                     <Tooltip />
-                    <Bar dataKey="ausencias" name="Ausencias" fill={COLORS.contra} radius={[6, 6, 0, 0]} />
+                    <Bar dataKey="ausencias" name="Ausencias" fill={COLORS.contra} radius={[6, 6, 0, 0]} animationDuration={1000} />
                   </BarChart>
                 </ResponsiveContainer>
               </div>
@@ -73,7 +74,7 @@ const AbsencesTab = ({ absences, areas }) => {
                     <XAxis dataKey="dia" />
                     <YAxis allowDecimals={false} />
                     <Tooltip />
-                    <Bar dataKey="ausencias" name="Ausencias" fill={COLORS.warn} radius={[6, 6, 0, 0]} />
+                    <Bar dataKey="ausencias" name="Ausencias" fill={COLORS.warn} radius={[6, 6, 0, 0]} animationDuration={1000} />
                   </BarChart>
                 </ResponsiveContainer>
               </div>
@@ -89,12 +90,13 @@ const AbsencesTab = ({ absences, areas }) => {
                   <YAxis type="category" dataKey="nombre" width={180} tick={{ fontSize: 11 }} />
                   <Tooltip />
                   <Legend />
-                  <Bar dataKey="total" name="Ausencias" fill={COLORS.contra} radius={[0, 6, 6, 0]} />
+                  <Bar dataKey="total" name="Ausencias" fill={COLORS.contra} radius={[0, 6, 6, 0]} animationDuration={1000} />
                 </BarChart>
               </ResponsiveContainer>
             </div>
             <div className="mt-4">
               <Table
+                fileName="ausencias_por_persona"
                 rows={people.map((person) => ({ ...person, key: person.pid }))}
                 columns={[
                   { key: 'nombre', label: 'Persona' },
@@ -108,6 +110,7 @@ const AbsencesTab = ({ absences, areas }) => {
 
           <Card title="Detalle de ausencias" subtitle="Fechas exactas en las que no hubo marcación.">
             <Table
+              fileName="detalle_ausencias"
               rows={[...items].sort((a, b) => b.fecha.localeCompare(a.fecha)).map((item) => ({ ...item, key: `${item.pid}-${item.fecha}` }))}
               columns={[
                 { key: 'fecha', label: 'Fecha', render: (row) => formatDate(row.fecha) },

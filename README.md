@@ -88,11 +88,11 @@ mysql -u root -p gacela_conecta < database/migrations/003_create_gcp_organizacio
 mysql -u root -p gacela_conecta < database/migrations/004_create_gcp_rbac_tables.sql
 mysql -u root -p gacela_conecta < database/migrations/005_create_gcp_audit_table.sql
 ```
-Para actualizar una instalación existente, ejecuta `php backend/scripts/run_migrations.php`. Las migraciones 020 y 021 incorporan las solicitudes de asignación, los estados de ticket `nueva`, `pendiente` y `cerrada`, y los permisos de incidencias para los roles de TI. La migración 020 crea también un activo de demostración para validar los mantenimientos semestrales.
+Para actualizar una instalación existente, ejecuta `php backend/scripts/run_migrations.php`. Las migraciones 020 y 021 incorporan las solicitudes de asignación y los estados de ticket. La migración 043 actualiza los catálogos de activos, proveedores e incidencias, incorpora observaciones de asignación y subcategorías de incidencias.
 
 4. **Iniciar servidor PHP:**
 ```bash
-php -S localhost:8001 -t public
+php -S 0.0.0.0:8002 -t public router.php
 ```
 
 ### Frontend Setup
@@ -110,7 +110,7 @@ cp .env.example .env
 
 El archivo `.env` ya está configurado por defecto:
 ```env
-VITE_API_URL=http://localhost:8001
+VITE_BACKEND_URL=http://127.0.0.1:8002
 ```
 
 3. **Iniciar servidor de desarrollo:**
@@ -118,7 +118,12 @@ VITE_API_URL=http://localhost:8001
 npm run dev
 ```
 
-La aplicación estará disponible en `http://localhost:5173`
+En PowerShell de Windows, si `npm run dev` falla porque la política de ejecución bloquea `npm.ps1`, usa:
+```powershell
+npm.cmd run dev
+```
+
+La aplicación estará disponible en `http://localhost:5173`.
 
 ### Contenido estático de Intranet
 
@@ -126,10 +131,12 @@ Los archivos de capacitación y los catálogos que los muestran se mantienen en 
 
 - **Píldoras GIS, PXP, FICS, Ofima y Frixo:** guarda los videos en `frontend/public/media/intranet/pildoras/<plataforma>/` y registra cada video en `frontend/public/media/intranet/pildoras/videos.json`. Cada elemento usa `titulo`, `archivo` y, opcionalmente, `descripcion`; `archivo` debe ser el nombre del video dentro de la carpeta de esa plataforma.
 - **Links de aplicativos:** guarda las imágenes en `frontend/public/media/intranet/aplicativos/images/` y configura título, URL e imagen en `frontend/public/media/intranet/aplicativos/links.json`. Las imágenes actuales son `pxp_flota.png`, `pxp_expreso.png`, `pxp_rapido.png`, `fics.png`, `ams.png`, `pag_flota.png`, `micom.png`, `prosegur.png` y `sgt.png`.
-- **Manuales técnicos:** guarda los PDF en `frontend/public/media/intranet/manuales/pdf/` y agrega sus metadatos en `frontend/public/media/intranet/manuales/manuales.json` con `titulo` y `archivo`; también admite `id`, `categoria` y `version`.
+- **Formatos:** se administran desde la pestaña Formatos de Intranet, por empresa y categoría (`gestion humana`, `compras`, `servicio al cliente` y `sistemas`). Los archivos y el catálogo se guardan en `frontend/public/media/intranet/formatos/`.
+- **Documentación:** se administra desde la pestaña Documentación de Intranet, por empresa, en `frontend/public/media/intranet/documentacion/`.
+- **Manuales técnicos:** se administran desde la pestaña Manuales Técnicos. Los archivos se guardan en `frontend/public/media/intranet/manuales/pdf/` y su catálogo en `manuales.json`.
 - **Documentos privados de Calidad:** guarda los PDF por empresa y opción en `backend/storage/intranet/calidad/{EmpresaId}/{opcion}/`. Al consultar Calidad se crean las nueve carpetas de la empresa afiliada seleccionada. Usa `vinculaciones`, `mantenimiento`, `torre-control`, `calidad`, `tecnologia`, `gerencia`, `servicio-cliente`, `gestion-humana` y `compras-proveedores` como nombres de carpeta. El ID debe ser el de `gcp_empresas`; estos documentos se entregan desde un endpoint autenticado y no deben moverse a `frontend/public`.
 
-Los catálogos JSON permiten agregar videos, aplicaciones o manuales sin modificar componentes React. Evita guardar archivos secretos en `public`, ya que todo su contenido es accesible desde el navegador.
+Los catálogos JSON se actualizan automáticamente al agregar o borrar formatos, documentación o manuales desde Intranet; solo los administradores pueden realizar esas acciones. Los botones Ver abren los PDF en el visor flotante de Intranet. Los documentos de Calidad también se administran desde su pestaña y continúan protegidos por autenticación y permisos de empresa/área. Evita guardar archivos secretos en `public`, ya que todo su contenido es accesible desde el navegador.
 
 ## Flujo de Autenticación (Magic Links)
 
@@ -166,13 +173,24 @@ Los catálogos JSON permiten agregar videos, aplicaciones o manuales sin modific
 - **GCP_Empresas** - Empresas
 - **GCP_Ciudades** - Ciudades
 - **GCP_Agencias** - Agencias
-- **GCP_Areas** - Áreas
+- **GCP_Areas** - Tabla del esquema inicial; la migración 031 la elimina.
 - **GCP_Cargos** - Cargos
 - **GCP_Roles** - Roles del sistema
 - **GCP_Permisos** - Permisos
 - **GCP_RolesPermisos** - Relación roles-permisos
-- **GCP_UsuariosRoles** - Relación usuarios-roles
+- **GCP_UsuariosRoles** - Tabla RBAC antigua; la migración 018 la elimina y cada usuario conserva `RolId`.
 - **GCP_AuditLog** - Bitácora de auditoría
+
+## Alcance del dashboard de horario
+
+- Administración y directivos consultan todas las marcaciones.
+- Gerencia consulta únicamente las personas asociadas a sus empresas en `gcp_usuariosempresas`.
+- RD solo puede consultarlo Diego Romero (cuenta registrada como Diego Romero Sanabria) y PDR solo Víctor Hugo Romero; esas cuentas quedan limitadas a su empresa aunque tengan otras empresas asociadas.
+- Los jefes con rol departamental consultan las personas asignadas al mismo rol; un jefe con rol estándar consulta su equipo directo configurado mediante `CargoJefeDirectoId`.
+- El área del jefe se limita a su área asignada y el selector no permite cambiarla.
+- Las marcaciones cuyo nombre no se asocia de forma única con un usuario activo se excluyen de los informes limitados.
+
+El filtro se aplica en el backend antes de calcular rangos, métricas y ausencias; no depende de filtros visuales del frontend.
 
 ## API Endpoints
 

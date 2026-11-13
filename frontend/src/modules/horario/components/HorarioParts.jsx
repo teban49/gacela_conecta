@@ -1,17 +1,23 @@
-import React from 'react';
+import React, { useRef, useState } from 'react';
 import {
   Bar, BarChart, CartesianGrid, Legend, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis,
 } from 'recharts';
 import { formatDate, formatMinutes } from '../utils/horarioStats';
+import { Download } from 'lucide-react';
+import { downloadTableAsXlsx } from '../utils/exportTable';
 
 export const COLORS = { favor: '#16a34a', contra: '#dc2626', neutral: '#0ea5e9', warn: '#f59e0b' };
+const ANIMATION_DURATION = 1000;
 
-export const Card = ({ title, subtitle, children, className = '' }) => (
+export const Card = ({ title, subtitle, headerAction, children, className = '' }) => (
   <section className={`rounded-2xl border border-slate-200 bg-white p-5 shadow-sm ${className}`}>
     {title && (
-      <header className="mb-4">
-        <h3 className="font-semibold text-slate-800">{title}</h3>
-        {subtitle && <p className="text-xs text-slate-500">{subtitle}</p>}
+      <header className="mb-4 flex items-start justify-between gap-3">
+        <div>
+          <h3 className="font-semibold text-slate-800">{title}</h3>
+          {subtitle && <p className="text-xs text-slate-500">{subtitle}</p>}
+        </div>
+        {headerAction}
       </header>
     )}
     {children}
@@ -43,11 +49,20 @@ export const Empty = ({ children }) => (
 );
 
 export const WeekdayChart = ({ data }) => {
-  const worst = data.reduce((max, item) => (item.minutosTarde > max.minutosTarde ? item : max), data[0]);
+  const [metric, setMetric] = useState('late');
+  const isLate = metric === 'late';
+  const valueKey = isLate ? 'minutosTarde' : 'minutosSalidaTemprano';
+  const metricLabel = isLate ? 'Llegadas tarde' : 'Salidas temprano';
+  const worst = data.reduce((max, item) => (item[valueKey] > max[valueKey] ? item : max), data[0]);
   return (
     <Card
-      title="Día de la semana con más llegadas tarde"
-      subtitle={worst?.minutosTarde > 0 ? `El día con más minutos de retraso es el ${worst.dia.toLowerCase()} (${formatMinutes(worst.minutosTarde)}).` : 'No hay llegadas tarde en el periodo.'}
+      title={`Día de la semana con más ${isLate ? 'llegadas tarde' : 'salidas temprano'}`}
+      subtitle={worst?.[valueKey] > 0 ? `El día con más minutos de ${isLate ? 'retraso' : 'salida temprana'} es el ${worst.dia.toLowerCase()} (${formatMinutes(worst[valueKey])}).` : `No hay ${metricLabel.toLowerCase()} en el periodo.`}
+      headerAction={(
+        <button type="button" onClick={() => setMetric(isLate ? 'early' : 'late')} className="shrink-0 rounded-lg border border-sky-600 px-3 py-1.5 text-xs font-semibold text-sky-700 hover:bg-sky-50">
+          Ver {isLate ? 'salidas temprano' : 'llegadas tarde'}
+        </button>
+      )}
     >
       <div className="h-72">
         <ResponsiveContainer width="100%" height="100%">
@@ -55,9 +70,9 @@ export const WeekdayChart = ({ data }) => {
             <CartesianGrid strokeDasharray="3 3" />
             <XAxis dataKey="dia" />
             <YAxis allowDecimals={false} />
-            <Tooltip formatter={(value, name) => [name === 'Llegadas tarde' ? value : `${value} min`, name]} />
+            <Tooltip formatter={(value) => [`${value} min`, metricLabel]} />
             <Legend />
-            <Bar dataKey="minutosTarde" name="Minutos tarde" fill={COLORS.contra} radius={[6, 6, 0, 0]} />
+            <Bar dataKey={valueKey} name={metricLabel} fill={isLate ? COLORS.contra : '#f97316'} radius={[6, 6, 0, 0]} animationDuration={ANIMATION_DURATION} />
           </BarChart>
         </ResponsiveContainer>
       </div>
@@ -75,36 +90,45 @@ export const DailyTrendChart = ({ data }) => (
           <YAxis />
           <Tooltip labelFormatter={formatDate} formatter={(value) => `${value} min`} />
           <Legend />
-          <Line type="monotone" dataKey="favor" name="A favor" stroke={COLORS.favor} strokeWidth={2} dot={false} />
-          <Line type="monotone" dataKey="contra" name="En contra" stroke={COLORS.contra} strokeWidth={2} dot={false} />
+          <Line type="monotone" dataKey="favor" name="A favor" stroke={COLORS.favor} strokeWidth={2} dot={false} animationDuration={ANIMATION_DURATION} />
+          <Line type="monotone" dataKey="contra" name="En contra" stroke={COLORS.contra} strokeWidth={2} dot={false} animationDuration={ANIMATION_DURATION} />
         </LineChart>
       </ResponsiveContainer>
     </div>
   </Card>
 );
 
-export const Table = ({ columns, rows, empty = 'Sin datos para mostrar.' }) => (
-  rows.length === 0 ? <Empty>{empty}</Empty> : (
-    <div className="max-h-96 overflow-auto rounded-xl border border-slate-100">
-      <table className="w-full text-left text-sm">
-        <thead className="sticky top-0 bg-slate-50 text-xs uppercase text-slate-500">
-          <tr>{columns.map((column) => <th key={column.key} className={`px-3 py-2 ${column.right ? 'text-right' : ''}`}>{column.label}</th>)}</tr>
-        </thead>
-        <tbody className="divide-y divide-slate-100">
-          {rows.map((row, index) => (
-            <tr key={row.key ?? index} className="hover:bg-slate-50">
-              {columns.map((column) => (
-                <td key={column.key} className={`px-3 py-2 ${column.right ? 'text-right tabular-nums' : ''}`}>
-                  {column.render ? column.render(row) : row[column.key]}
-                </td>
-              ))}
-            </tr>
-          ))}
-        </tbody>
-      </table>
+export const Table = ({ columns, rows, empty = 'Sin datos para mostrar.', fileName = 'tabla_horario' }) => {
+  const tableRef = useRef(null);
+  if (rows.length === 0) return <Empty>{empty}</Empty>;
+  return (
+    <div>
+      <div className="mb-2 flex justify-end">
+        <button type="button" onClick={() => downloadTableAsXlsx(tableRef.current, fileName)} className="inline-flex items-center gap-2 rounded-lg border border-emerald-600 px-3 py-1.5 text-xs font-semibold text-emerald-700 hover:bg-emerald-50">
+          <Download size={14} aria-hidden="true" /> Exportar Excel
+        </button>
+      </div>
+      <div className="max-h-96 overflow-auto rounded-xl border border-slate-100">
+        <table ref={tableRef} className="w-full text-left text-sm">
+          <thead className="sticky top-0 bg-slate-50 text-xs uppercase text-slate-500">
+            <tr>{columns.map((column) => <th key={column.key} className={`px-3 py-2 ${column.right ? 'text-right' : ''}`}>{column.label}</th>)}</tr>
+          </thead>
+          <tbody className="divide-y divide-slate-100">
+            {rows.map((row, index) => (
+              <tr key={row.key ?? index} className="hover:bg-slate-50">
+                {columns.map((column) => (
+                  <td key={column.key} className={`px-3 py-2 ${column.right ? 'text-right tabular-nums' : ''}`}>
+                    {column.render ? column.render(row) : row[column.key]}
+                  </td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     </div>
-  )
-);
+  );
+};
 
 export const Minutes = ({ value, tone }) => {
   const color = tone === 'favor' ? 'text-green-700' : tone === 'contra' ? 'text-red-700' : 'text-slate-700';
@@ -119,6 +143,7 @@ export const InconsistencyTable = ({ rows }) => {
       subtitle="Días en los que falta registrar la entrada o la salida. No suman minutos a favor ni en contra."
     >
       <Table
+        fileName="marcaciones_incompletas"
         empty="No hay inconsistencias en el periodo."
         rows={items.map((row) => ({ ...row, key: `${row.pid}-${row.fecha}` }))}
         columns={[

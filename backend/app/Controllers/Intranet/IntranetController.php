@@ -135,7 +135,7 @@ class IntranetController
         $name = basename($path);
         header('Content-Type: application/pdf');
         header('Content-Length: ' . (string) filesize($path));
-        header('Content-Disposition: attachment; filename="' . addcslashes($name, "\\\"") . '"; filename*=UTF-8\'\'' . rawurlencode($name));
+        header('Content-Disposition: inline; filename="' . addcslashes($name, "\\\"") . '"; filename*=UTF-8\'\'' . rawurlencode($name));
         header('X-Content-Type-Options: nosniff');
         header('Cache-Control: private, no-store');
         readfile($path);

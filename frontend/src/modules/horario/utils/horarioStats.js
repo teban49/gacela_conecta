@@ -35,6 +35,7 @@ export const byWeekday = (rows) => WEEKDAYS.slice(0, 5).map((name, index) => {
   return {
     dia: name,
     minutosTarde: sum(dayRows, 'tarde'),
+    minutosSalidaTemprano: sum(dayRows, 'salidaTemprano'),
     promedioTarde: dayRows.length ? Math.round(sum(dayRows, 'tarde') / dayRows.length) : 0,
     llegadasTarde: late.length,
   };

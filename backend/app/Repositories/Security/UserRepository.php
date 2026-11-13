@@ -210,8 +210,7 @@ class UserRepository extends BaseRepository
     }
 
     /**
-     * Campos de persona comunes a crear/editar. Los usuarios sin correo (conductores, etc.)
-     * reciben usuario inicial.apellido y contraseña igual a su cédula; los taquilleros no tienen acceso.
+     * Los usuarios sin correo (excepto taquilleros) usan su cédula como usuario.
      */
     private function personFields(array $user, ?int $id): array
     {
@@ -249,8 +248,8 @@ class UserRepository extends BaseRepository
                 if ($cedula === null) {
                     throw new \InvalidArgumentException('Un usuario sin correo requiere cédula para generar su acceso.');
                 }
-                if ($usuario === null) {
-                    $usuario = $this->generateUsername((string) $user['Nombres'], (string) $user['Apellidos'], $id);
+                $usuario = $cedula;
+                if ($existing === null) {
                     $passwordHash = password_hash($cedula, PASSWORD_BCRYPT);
                 }
             }
@@ -276,39 +275,6 @@ class UserRepository extends BaseRepository
             ':Direccion' => $text($user['Direccion'] ?? null, 255),
             ':Area' => $text($user['Area'] ?? null, 100),
         ];
-    }
-
-    public function generateUsername(string $nombres, string $apellidos, ?int $ignoreId = null): string
-    {
-        $slug = static function (string $s): string {
-            $s = strtr($s, ['á' => 'a', 'é' => 'e', 'í' => 'i', 'ó' => 'o', 'ú' => 'u', 'ü' => 'u', 'ñ' => 'n',
-                'Á' => 'a', 'É' => 'e', 'Í' => 'i', 'Ó' => 'o', 'Ú' => 'u', 'Ü' => 'u', 'Ñ' => 'n']);
-            return preg_replace('/[^a-z0-9]/', '', strtolower($s));
-        };
-
-        $first = $slug(preg_split('/\s+/', trim($nombres))[0] ?? '');
-        $tokens = preg_split('/\s+/', trim($apellidos)) ?: [];
-        $particles = ['de', 'del', 'la', 'las', 'los', 'san', 'santa', 'y'];
-        $surname = '';
-        foreach ($tokens as $i => $token) {
-            $surname .= $slug($token);
-            if (!in_array(strtolower($token), $particles, true)) {
-                break;
-            }
-        }
-
-        $base = ($first !== '' ? $first[0] : 'u') . '.' . ($surname !== '' ? $surname : 'usuario');
-        $candidate = $base;
-        $n = 1;
-        $check = $this->db->prepare('SELECT COUNT(*) FROM gcp_usuarios WHERE Usuario = :u AND Id <> :id');
-        while (true) {
-            $check->execute([':u' => $candidate, ':id' => $ignoreId ?? 0]);
-            if ((int) $check->fetchColumn() === 0) {
-                return $candidate;
-            }
-            $n++;
-            $candidate = $base . $n;
-        }
     }
 
     private function getCompanyIds(array $user): array
