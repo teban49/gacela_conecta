@@ -857,7 +857,7 @@ syncUserRoles(userId, roleIds)
 
 ### Flujo de Autenticación
 
-1. **Login:**
+1. **Login con correo corporativo:**
    - Usuario ingresa email
    - Frontend llama a `/api/v1/auth/magic-link`
    - Backend genera token, envía email
@@ -865,7 +865,13 @@ syncUserRoles(userId, roleIds)
    - Backend valida token, genera JWT
    - Frontend almacena JWT
 
-2. **Peticiones Protegidas:**
+2. **Login sin correo corporativo:**
+   - El usuario inicia sesión en `POST /api/v1/auth/login` con `usuario` y `password`.
+   - El nombre de usuario es la cédula normalizada a dígitos.
+   - Las cuentas existentes conservan su contraseña; las cuentas nuevas sin correo reciben inicialmente la cédula como contraseña.
+   - Los taquilleros mantienen la configuración existente sin acceso directo.
+
+3. **Peticiones Protegidas:**
    - Frontend incluye JWT en header `Authorization: Bearer {token}`
    - `JwtMiddleware` valida token
    - Verifica estado del usuario en BD
@@ -873,7 +879,7 @@ syncUserRoles(userId, roleIds)
    - Establece usuario en `Auth`
    - Si usuario inactivo → 403 Forbidden
 
-3. **Validación de Permisos:**
+4. **Validación de Permisos:**
    - `PermissionMiddleware` verifica permiso específico
    - Métodos estáticos: `check()`, `checkAny()`, `checkAll()`
    - Si no tiene permiso → 403 Forbidden
@@ -1108,8 +1114,8 @@ El módulo de Gestión Tecnológica gestiona tickets de soporte, incidencias y s
 ### Funcionalidades Clave
 - Sistema de tickets con códigos automáticos
 - Categorización y asignación de tickets
-- Seguimiento completo del ciclo de vida
-- Sistema de prioridades y SLA
+- Flujo de estados Nuevo → Pendiente → Cerrado, sin transición automática por tiempo
+- Plazos SLA por prioridad: baja (1 mes), media (21 días), alta (14 días) y crítica (7 días); los tickets abiertos vencidos se resaltan en rojo
 - Plantillas de respuesta y estadísticas
 
 ---
@@ -1132,8 +1138,9 @@ El módulo de Gestión Tecnológica administra activos tecnológicos, mantenimie
 - Inventario de activos tecnológicos
 - Gestión de mantenimiento preventivo y correctivo
 - Sistema de incidencias tecnológicas
-- Control de licencias de software
+- Control de licencias de software; asociar activos es opcional
 - Gestión de proveedores y contratos
+- Exportación de activos y mantenimientos a Excel, respetando los filtros aplicados
 
 ---
 

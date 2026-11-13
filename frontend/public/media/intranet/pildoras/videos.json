@@ -1,0 +1,186 @@
+﻿{
+    "GIS":  [
+                {
+                    "titulo":  "Aceptacion de mantenimiento",
+                    "archivo":  "Aceptacion-de-mantenimiento.mp4"
+                },
+                {
+                    "titulo":  "Creacion de incidencia",
+                    "archivo":  "Creacion-de-incidencia.mp4"
+                }
+            ],
+    "PXP":  [
+                {
+                    "titulo":  "Anular despacho",
+                    "archivo":  "Anular-despacho.mp4"
+                },
+                {
+                    "titulo":  "Anular una venta o guia",
+                    "archivo":  "Anular-una-venta-o-guia.mp4"
+                },
+                {
+                    "titulo":  "Apertura de caja",
+                    "archivo":  "Apertura-de-caja.mp4"
+                },
+                {
+                    "titulo":  "Cierre de Caja por Oficina",
+                    "archivo":  "Cierre-de-Caja-por-Oficina.mp4"
+                },
+                {
+                    "titulo":  "Cierre de caja",
+                    "archivo":  "Cierre-de-caja.mp4"
+                },
+                {
+                    "titulo":  "Comprobante de caja",
+                    "archivo":  "Comprobante-de-caja.mp4"
+                },
+                {
+                    "titulo":  "Configuracion pantalla e impresora PXP",
+                    "archivo":  "Configuracion-pantalla-e-impresora-PXP.mp4"
+                },
+                {
+                    "titulo":  "Generar un despacho",
+                    "archivo":  "Generar-un-despacho.mp4"
+                },
+                {
+                    "titulo":  "Generar una venta o guia",
+                    "archivo":  "Generar-una-venta-o-guia.mp4"
+                }
+            ],
+    "FICS":  [
+                 {
+                     "titulo":  "Anulacion de despacho",
+                     "archivo":  "Anulacion-de-despacho.mp4"
+                 },
+                 {
+                     "titulo":  "Anulacion de tiquet",
+                     "archivo":  "Anulacion-de-tiquet.mp4"
+                 },
+                 {
+                     "titulo":  "Apertura caja FICS",
+                     "archivo":  "Apertura-caja-FICS.mp4"
+                 },
+                 {
+                     "titulo":  "Asociar tiquet",
+                     "archivo":  "Asociar-tiquet.mp4"
+                 },
+                 {
+                     "titulo":  "Generacion de despacho",
+                     "archivo":  "Generacion-de-despacho.mp4"
+                 },
+                 {
+                     "titulo":  "Pago con boleto",
+                     "archivo":  "Pago-con-boleto.mp4"
+                 },
+                 {
+                     "titulo":  "Reimpresion de tiquete",
+                     "archivo":  "Reimpresion-de-tiquete.mp4"
+                 },
+                 {
+                     "titulo":  "Tiquet estado abierto",
+                     "archivo":  "Tiquet-estado-abierto.mp4"
+                 },
+                 {
+                     "titulo":  "Venta en FICS",
+                     "archivo":  "Venta-en-FICS.mp4"
+                 }
+             ],
+    "Ofima":  [
+                  {
+                      "titulo":  "Módulo Inventarios",
+                      "youtube":  {
+                                      "video":  "e0ekTUNQPmo",
+                                      "lista":  "PL62Arhc1slLRfEIE3AkhCb-XQ_TWB7dR5"
+                                  }
+                  },
+                  {
+                      "titulo":  "Módulo Facturación",
+                      "youtube":  {
+                                      "video":  "DeNrGNB-eyE",
+                                      "lista":  "PL62Arhc1slLSWrzWN-jG9MGMBNP25L1Zg"
+                                  }
+                  },
+                  {
+                      "titulo":  "Lista de capacitación Ofima 3",
+                      "youtube":  {
+                                      "lista":  "PL62Arhc1slLT_Z9VUNgm5ORle4soAa2TN"
+                                  }
+                  },
+                  {
+                      "titulo":  "Módulo Compras",
+                      "youtube":  {
+                                      "video":  "G0SPYF4I1o4",
+                                      "lista":  "PL62Arhc1slLSD2DWBgjoNslaP8eoFGA5J"
+                                  }
+                  },
+                  {
+                      "titulo":  "Módulo Cartera",
+                      "youtube":  {
+                                      "video":  "NJnUPCA8PqY",
+                                      "lista":  "PL62Arhc1slLSF0j1PMm0xNEzCUhW4Wm6T"
+                                  }
+                  },
+                  {
+                      "titulo":  "Módulo Punto de venta",
+                      "youtube":  {
+                                      "video":  "QzSKbp8Mdh8",
+                                      "lista":  "PL62Arhc1slLQGymKnpWdVwOPwWv8rEbsN"
+                                  }
+                  },
+                  {
+                      "titulo":  "Lista de capacitación Ofima 7",
+                      "youtube":  {
+                                      "lista":  "PL62Arhc1slLQdDIEltq9iMxJU1H_szFyh"
+                                  }
+                  },
+                  {
+                      "titulo":  "Lista de capacitación Ofima 8",
+                      "youtube":  {
+                                      "lista":  "PL62Arhc1slLRoKlyPIU4kKS2BV2VRWJps"
+                                  }
+                  },
+                  {
+                      "titulo":  "Lista de capacitación Ofima 9",
+                      "youtube":  {
+                                      "lista":  "PL62Arhc1slLSsELG5F8U-cXZWO7yd-H2t"
+                                  }
+                  },
+                  {
+                      "titulo":  "Módulo Nómina",
+                      "youtube":  {
+                                      "video":  "idGR83W8mPs",
+                                      "lista":  "PL62Arhc1slLQOAQ0fbFx2Zqf2UWFUHZtb"
+                                  }
+                  },
+                  {
+                      "titulo":  "Módulo Importación",
+                      "youtube":  {
+                                      "video":  "IRJAdGYeJoM",
+                                      "lista":  "PL62Arhc1slLQrxHwBv-wXo1Kehj82llsO"
+                                  }
+                  },
+                  {
+                      "titulo":  "Módulo Cuentas por pagar",
+                      "youtube":  {
+                                      "video":  "Lj64EHM43IU",
+                                      "lista":  "PL62Arhc1slLS2wEHeQg3e1waoQnEpwQYT"
+                                  }
+                  },
+                  {
+                      "titulo":  "Módulo Bancos",
+                      "youtube":  {
+                                      "video":  "vjhiWsqteFA"
+                                  }
+                  }
+              ],
+    "Frixo":  [
+                  {
+                      "titulo":  "Generar despacho",
+                      "archivo":  "Generar_despacho.mp4"
+                  },
+                  {
+                      "titulo":  "Generar venta",
+                      "archivo":  "Generar_venta.mp4"
+                  }
+              ]
+}

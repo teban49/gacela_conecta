@@ -1,4 +1,4 @@
-# Environment variables and local secrets
+# Local environment and secrets; keep example templates
 .env
 **/.env
 .env.*
@@ -6,29 +6,55 @@
 !.env.example
 !**/.env.example
 
-# Dependencies and generated frontend output
+# Dependencies and generated build output
 **/node_modules/
 **/vendor/
 **/dist/
 **/build/
+**/.vite/
+**/coverage/
+**/.nyc_output/
+**/.phpunit.cache/
+**/.phpunit.result.cache
+**/*.tsbuildinfo
+npm-debug.log*
+yarn-debug.log*
+pnpm-debug.log*
 
-# Runtime data, uploads, caches, and logs
+# Runtime data, private uploads, caches, and logs
 backend/storage/**
 !backend/storage/**/.gitkeep
 **/cache/
 **/logs/
 **/*.log
 **/temp/
+**/*.tmp
 
-# Local database backups and exports
+# Local database backups and generated exports
 database/backups/
 database/exports/
 
-# OS/editor artifacts
+# Large Intranet training videos are stored outside Git; keep videos.json and .gitkeep files.
+frontend/public/media/intranet/pildoras/*.mp4
+frontend/public/media/intranet/pildoras/**/*.mp4
+frontend/public/media/intranet/pildoras/*.MP4
+frontend/public/media/intranet/pildoras/**/*.MP4
+frontend/public/media/intranet/pildoras/**/*.mov
+frontend/public/media/intranet/pildoras/**/*.MOV
+frontend/public/media/intranet/pildoras/**/*.avi
+frontend/public/media/intranet/pildoras/**/*.AVI
+frontend/public/media/intranet/pildoras/**/*.mkv
+frontend/public/media/intranet/pildoras/**/*.MKV
+frontend/public/media/intranet/pildoras/**/*.webm
+frontend/public/media/intranet/pildoras/**/*.WEBM
+frontend/public/media/intranet/pildoras/**/*.wmv
+frontend/public/media/intranet/pildoras/**/*.WMV
+frontend/public/media/intranet/pildoras/**/*.m4v
+frontend/public/media/intranet/pildoras/**/*.M4V
+
+# OS and editor artifacts
 Thumbs.db
+Desktop.ini
 .DS_Store
 .idea/
 .vscode/
-
-# Videos pesados (superan el limite de GitHub)
-frontend/public/media/intranet/pildoras/

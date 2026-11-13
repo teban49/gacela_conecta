@@ -20,7 +20,7 @@
 **Gacela Conecta** es una plataforma corporativa del Grupo Gacela implementada según las especificaciones SADD v1.0. Es una aplicación web que sigue el principio **GCP FIRST** (Gacela Core Platform First), donde el Frontend (React + Vite) y el Backend (PHP) están 100% desacoplados, comunicándose exclusivamente mediante JSON a través de una API REST.
 
 ### Características Principales
-- **Autenticación sin contraseñas** (Magic Links)
+- **Autenticación** mediante Magic Links para correo corporativo y usuario/contraseña para cuentas sin correo (usuario: cédula)
 - **Control de acceso basado en roles** (RBAC)
 - **Estructura organizacional jerárquica** (Grupo > Empresa > Ciudad > Agencia > Área > Cargo > Usuario)
 - **Sistema de auditoría** automático
@@ -50,7 +50,7 @@
 - **Lucide React** para iconos
 
 ### Servicios Transversales GCP
-1. **Authentication Engine** - Magic Links / Passwordless
+1. **Authentication Engine** - Magic Links y acceso con cédula/contraseña para cuentas sin correo
 2. **Authorization Engine** - RBAC (Permisos por Rol/Cargo)
 3. **Organization Engine** - Grupo > Empresa > Ciudad > Agencia > Área > Cargo > Usuario
 4. **Audit Engine** - Registro de bitácora automático
@@ -1979,11 +1979,11 @@ Gacela Conecta Beta_V2/
 
 ## Conclusión
 
-El proyecto **Gacela Conecta Beta_V2** es una aplicación corporativa con arquitectura moderna desacoplada (React + PHP). Tiene una base sólida con autenticación por Magic Links completamente funcional, estructura de base de datos bien diseñada con jerarquía organizacional y RBAC, y frontend React con rutas protegidas.
+El proyecto **Gacela Conecta Beta_V2** es una aplicación corporativa con arquitectura moderna desacoplada (React + PHP). Incluye autenticación por Magic Link para usuarios con correo corporativo y acceso con cédula y contraseña para cuentas sin correo, además de jerarquía organizacional, RBAC y rutas protegidas.
 
 **Puntos fuertes**:
 - Arquitectura limpia y desacoplada
-- Autenticación password-less segura
+- Autenticación con Magic Link y acceso con cédula y contraseña para cuentas sin correo
 - Estructura de base de datos completa y escalable
 - Frontend React moderno con hooks y contextos
 - Sistema de rutas protegidas funcionando

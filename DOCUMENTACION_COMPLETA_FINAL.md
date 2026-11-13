@@ -20,14 +20,14 @@
 **Tipo**: Sistema ERP Corporativo  
 **Tecnologías**: PHP 8.x (Backend), React 18 (Frontend), MySQL (Base de Datos)  
 **Arquitectura**: REST API + SPA (Single Page Application)  
-**Autenticación**: JWT + Magic Link  
+**Autenticación**: JWT + Magic Link para correo corporativo y usuario/contraseña para cuentas sin correo
 **Autorización**: RBAC (Role-Based Access Control)
 
 ### Propósito
 Sistema de gestión empresarial para administración de usuarios, roles, permisos, aplicaciones, intranet, solicitudes y gestión tecnológica.
 
 ### Características Principales
-- Autenticación segura con Magic Link y JWT
+- Autenticación segura con Magic Link, acceso con cédula para cuentas sin correo y JWT
 - Sistema de permisos granular RBAC
 - Sidebar dinámico desde base de datos
 - Invalidación inmediata de sesiones

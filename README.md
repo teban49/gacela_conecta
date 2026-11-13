@@ -10,7 +10,7 @@ El núcleo de la solución sigue el principio **GCP FIRST**, donde el Frontend (
 
 ### Servicios Transversales GCP
 
-1. **Authentication Engine** - Magic Links / Passwordless
+1. **Authentication Engine** - Magic Links para correo corporativo y usuario/contraseña para cuentas sin correo
 2. **Authorization Engine** - RBAC (Permisos por Rol/Cargo)
 3. **Organization Engine** - Grupo > Empresa > Ciudad > Agencia > Área > Cargo > Usuario
 4. **Audit Engine** - Registro de bitácora automático
@@ -80,18 +80,17 @@ MAIL_FROM_NAME=Gacela Conecta
 ```
 
 3. **Ejecutar migraciones de base de datos:**
+Antes de ejecutar el runner, crea una base de datos vacía cuyo nombre coincida con `DB_DATABASE` en `backend/.env`.
+
 ```bash
-# Ejecutar los archivos SQL en database/migrations/
-mysql -u root -p gacela_conecta < database/migrations/001_create_gcp_usuarios_table.sql
-mysql -u root -p gacela_conecta < database/migrations/002_create_gcp_authtokens_table.sql
-mysql -u root -p gacela_conecta < database/migrations/003_create_gcp_organizaciones_table.sql
-mysql -u root -p gacela_conecta < database/migrations/004_create_gcp_rbac_tables.sql
-mysql -u root -p gacela_conecta < database/migrations/005_create_gcp_audit_table.sql
+cd ..
+php backend/scripts/run_migrations.php
 ```
-Para actualizar una instalación existente, ejecuta `php backend/scripts/run_migrations.php`. Las migraciones 020 y 021 incorporan las solicitudes de asignación y los estados de ticket. La migración 043 actualiza los catálogos de activos, proveedores e incidencias, incorpora observaciones de asignación y subcategorías de incidencias.
+El runner aplica las migraciones registradas tanto en instalaciones nuevas como existentes. No ejecutes manualmente migraciones individuales ya registradas. Las migraciones 044 y 045 actualizan los SLA y el usuario de las cuentas sin correo a la cédula, respectivamente; las contraseñas existentes no se modifican.
 
 4. **Iniciar servidor PHP:**
 ```bash
+cd backend
 php -S 0.0.0.0:8002 -t public router.php
 ```
 
@@ -129,7 +128,7 @@ La aplicación estará disponible en `http://localhost:5173`.
 
 Los archivos de capacitación y los catálogos que los muestran se mantienen en `frontend/public/media/intranet/`. Después de iniciar Vite, esos archivos se sirven desde `/media/intranet/`.
 
-- **Píldoras GIS, PXP, FICS, Ofima y Frixo:** guarda los videos en `frontend/public/media/intranet/pildoras/<plataforma>/` y registra cada video en `frontend/public/media/intranet/pildoras/videos.json`. Cada elemento usa `titulo`, `archivo` y, opcionalmente, `descripcion`; `archivo` debe ser el nombre del video dentro de la carpeta de esa plataforma.
+- **Píldoras GIS, PXP, FICS, Ofima y Frixo:** guarda los videos en `frontend/public/media/intranet/pildoras/<plataforma>/` y registra cada video en `frontend/public/media/intranet/pildoras/videos.json`. Cada elemento usa `titulo`, `archivo` y, opcionalmente, `descripcion`; `archivo` debe ser el nombre del video dentro de la carpeta de esa plataforma. Los videos grandes se excluyen de Git; el catálogo JSON sí se versiona y los videos deben copiarse al entorno de despliegue.
 - **Links de aplicativos:** guarda las imágenes en `frontend/public/media/intranet/aplicativos/images/` y configura título, URL e imagen en `frontend/public/media/intranet/aplicativos/links.json`. Las imágenes actuales son `pxp_flota.png`, `pxp_expreso.png`, `pxp_rapido.png`, `fics.png`, `ams.png`, `pag_flota.png`, `micom.png`, `prosegur.png` y `sgt.png`.
 - **Formatos:** se administran desde la pestaña Formatos de Intranet, por empresa y categoría (`gestion humana`, `compras`, `servicio al cliente` y `sistemas`). Los archivos y el catálogo se guardan en `frontend/public/media/intranet/formatos/`.
 - **Documentación:** se administra desde la pestaña Documentación de Intranet, por empresa, en `frontend/public/media/intranet/documentacion/`.
@@ -138,7 +137,16 @@ Los archivos de capacitación y los catálogos que los muestran se mantienen en 
 
 Los catálogos JSON se actualizan automáticamente al agregar o borrar formatos, documentación o manuales desde Intranet; solo los administradores pueden realizar esas acciones. Los botones Ver abren los PDF en el visor flotante de Intranet. Los documentos de Calidad también se administran desde su pestaña y continúan protegidos por autenticación y permisos de empresa/área. Evita guardar archivos secretos en `public`, ya que todo su contenido es accesible desde el navegador.
 
-## Flujo de Autenticación (Magic Links)
+## Gestión Tecnológica
+
+- Los tickets siguen el flujo **Nuevo → Pendiente → Cerrado**; no hay una transición automática por tiempo.
+- Los SLA se calculan por prioridad: baja, 1 mes; media, 21 días; alta, 14 días; crítica, 7 días. Los tickets abiertos vencidos se resaltan en rojo.
+- Los activos y mantenimientos se pueden exportar a Excel con los filtros de búsqueda/agencia aplicados.
+- Asociar activos a una licencia es opcional.
+
+## Métodos de Autenticación
+
+### Correo corporativo: Magic Link
 
 ### 1. Solicitud de Magic Link
 - **Frontend:** Usuario ingresa correo corporativo en `/login`
@@ -162,6 +170,10 @@ Los catálogos JSON se actualizan automáticamente al agregar o borrar formatos,
 - **Frontend:** Almacena Bearer Token en `localStorage`
 - **Backend:** Valida token en cada petición protegida
 - **Expiración:** 12 horas (configurable)
+
+### Usuarios sin correo corporativo
+
+Estas cuentas inician sesión con `POST /api/v1/auth/login`, enviando `usuario` y `password`. El usuario es la cédula normalizada a dígitos; la migración actualiza las cuentas existentes sin cambiar sus contraseñas. Para una cuenta nueva sin correo, la contraseña inicial es la cédula. Los taquilleros conservan la configuración existente sin acceso directo.
 
 ## Estructura de Base de Datos
 
@@ -195,6 +207,17 @@ El filtro se aplica en el backend antes de calcular rangos, métricas y ausencia
 ## API Endpoints
 
 ### Autenticación
+
+#### POST `/api/v1/auth/login`
+Inicia sesión con usuario y contraseña para cuentas sin correo corporativo.
+
+**Request:**
+```json
+{
+  "usuario": "1234567890",
+  "password": "contraseña"
+}
+```
 
 #### POST `/api/v1/auth/magic-link`
 Solicita un magic link para autenticación.
@@ -273,6 +296,11 @@ Cierra la sesión del usuario.
 - **Hash SHA-256:** Tokens almacenados como hash
 - **Prevención de enumeración:** Mensaje genérico para usuarios inexistentes
 
+### Cuentas sin correo corporativo
+- Inician sesión con usuario y contraseña en `/api/v1/auth/login`.
+- El usuario es la cédula normalizada a dígitos.
+- El acceso está protegido contra intentos repetidos (5 intentos fallidos en 15 minutos).
+
 ### JWT Tokens
 - **Algoritmo:** HS256
 - **Expiración:** 12 horas (configurable)
@@ -339,7 +367,7 @@ npm run preview
 
 1. **GCP FIRST:** Todo módulo debe usar los servicios transversales de GCP. No duplicar lógica de permisos, auditoría o archivos.
 
-2. **Passwordless:** Está estrictamente prohibido el uso de contraseñas tradicionales. Solo Magic Links.
+2. **Autenticación:** Magic Link para correo corporativo; las cuentas sin correo usan cédula y contraseña.
 
 3. **Desacoplamiento:** Frontend y Backend son completamente independientes. La comunicación es exclusivamente vía API REST.
 

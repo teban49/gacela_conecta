@@ -1,122 +1,70 @@
-# Guía de Instalación - Nuevos Módulos
+# Guía de instalación
 
-## Pasos para la Implementación Completa
+Guía para preparar el entorno actual de Gacela Conecta. Para detalles funcionales y configuración de variables, consulta también [README.md](README.md).
 
-### 1. Ejecutar Migraciones de Base de Datos
+## Requisitos
 
-Los archivos de migración se encuentran en `database/migrations/`:
+- PHP y Composer compatibles con el proyecto.
+- MySQL compatible con la configuración del backend.
+- Node.js y npm.
+- Acceso a los archivos de medios de la Intranet, si se requiere mostrar sus documentos.
 
-- `009_create_intranet_tables.sql`
-- `010_create_solicitudes_tables.sql`
-- `011_create_gestion_tecnologica_tables.sql`
+## Preparar el backend
 
-**Opción A: Ejecución Manual via Cliente MySQL**
-```bash
-mysql -u root -p gacela_conecta_beta < database/migrations/009_create_intranet_tables.sql
-mysql -u root -p gacela_conecta_beta < database/migrations/010_create_solicitudes_tables.sql
-mysql -u root -p gacela_conecta_beta < database/migrations/011_create_gestion_tecnologica_tables.sql
-```
+1. Crea una base de datos MySQL vacía y configura sus credenciales en `backend/.env`, tomando como referencia `backend/.env.example`.
+2. Instala las dependencias desde la carpeta `backend`:
 
-**Opción B: Ejecución via Script PHP**
-```bash
-cd backend/scripts
-php run_migrations.php
-```
+   ```powershell
+   cd backend
+   composer install
+   cd ..
+   ```
 
-### 2. Ejecutar Scripts de Permisos
+3. Ejecuta las migraciones registradas por el proyecto desde la raíz:
 
-Los scripts de permisos se encuentran en `backend/scripts/`:
+   ```powershell
+   php backend/scripts/run_migrations.php
+   ```
 
-- `add_intranet_permissions.php`
-- `add_solicitudes_permissions.php`
-- `add_gestion_permissions.php`
+   El runner administra el orden y el registro de migraciones. No ejecutes manualmente migraciones individuales ya registradas.
 
-**Ejecución:**
-```bash
-cd backend/scripts
-php add_intranet_permissions.php
-php add_solicitudes_permissions.php
-php add_gestion_permissions.php
-```
+4. Inicia el backend desde una terminal:
 
-### 3. Verificar Integración Frontend
+   ```powershell
+   cd backend
+   php -S 0.0.0.0:8002 -t public router.php
+   ```
 
-Los componentes ya están integrados en:
-- `frontend/src/router/index.jsx` - Rutas configuradas
-- `frontend/src/components/Sidebar.jsx` - Menú actualizado
+## Preparar el frontend
 
-### 4. Verificar Rutas Backend
+1. Configura `frontend/.env` a partir de `frontend/.env.example`, si aplica.
+2. Instala dependencias e inicia el servidor local:
 
-Los archivos de rutas ya están creados y se cargan automáticamente:
-- `backend/routes/intranet.php`
-- `backend/routes/solicitudes.php`
-- `backend/routes/gestion.php`
+   ```powershell
+   cd frontend
+   npm install
+   npm run dev
+   ```
 
-## Verificación
+3. Para verificar la compilación de producción:
 
-### Verificar Tablas Creadas
-```sql
-SHOW TABLES LIKE 'intranet_%';
-SHOW TABLES LIKE 'solicitudes_%';
-SHOW TABLES LIKE 'gestion_%';
-```
+   ```powershell
+   npm run build
+   ```
 
-### Verificar Permisos Creados
-```sql
-SELECT * FROM gcp_permisos WHERE CodigoUnico LIKE 'intranet.%';
-SELECT * FROM gcp_permisos WHERE CodigoUnico LIKE 'solicitudes.%';
-SELECT * FROM gcp_permisos WHERE CodigoUnico LIKE 'gestion.%';
-```
+## Acceso de usuarios
 
-### Verificar Permisos Asignados al Rol Admin
-```sql
-SELECT rp.*, p.CodigoUnico 
-FROM gcp_rolespermisos rp 
-JOIN gcp_permisos p ON p.Id = rp.PermisoId 
-WHERE rp.RolId = 1 
-AND p.CodigoUnico IN ('intranet.ver', 'solicitudes.ver', 'gestion.ver');
-```
+- Las cuentas con correo corporativo pueden usar el flujo de Magic Link habilitado en la aplicación.
+- Las cuentas sin correo corporativo inician sesión con su cédula normalizada a dígitos como usuario y su contraseña.
+- No cambies contraseñas ni ejecutes migraciones de datos manualmente durante la instalación.
 
-## Arquitectura Implementada
+## Archivos de la Intranet
 
-### Módulo INTRANET
-- **Base de Datos**: 8 tablas (noticias, documentos, eventos, foro)
-- **Backend**: 3 repositories, 3 services, 3 controllers
-- **Frontend**: 1 API service, 1 componente principal
-- **Permisos**: 5 permisos específicos
+Los documentos y otros medios usados por la Intranet deben estar disponibles bajo `frontend/public/media/intranet`. El `.gitignore` excluye los archivos de video pesados de las píldoras; conserva el catálogo `videos.json`. Asegúrate de provisionar esos medios por el mecanismo aprobado para el entorno.
 
-### Módulo SOLICITUDES
-- **Base de Datos**: 7 tablas (solicitudes, categorías, seguimiento, etc.)
-- **Backend**: 2 repositories, 2 services, 2 controllers
-- **Frontend**: 1 API service, 1 componente principal
-- **Permisos**: 4 permisos específicos
+## Si falla la instalación
 
-### Módulo GESTIÓN TECNOLÓGICA
-- **Base de Datos**: 7 tablas (activos, mantenimiento, incidencias, licencias)
-- **Backend**: 1 repository, 1 service, 1 controller
-- **Frontend**: 1 API service, 1 componente principal
-- **Permisos**: 5 permisos específicos
-
-## Solución de Problemas
-
-### Si las migraciones fallan:
-1. Verificar credenciales en `.env`
-2. Asegurar que la base de datos exista
-3. Verificar permisos del usuario MySQL
-
-### Si los scripts de permisos fallan:
-1. Verificar que las aplicaciones existan en `gcp_aplicaciones`
-2. Asegurar que el rol administrador (Id=1) exista
-3. Revisar conexión a la base de datos
-
-### Si el frontend no muestra los módulos:
-1. Verificar que los componentes estén importados correctamente
-2. Revisar permisos del usuario autenticado
-3. Verificar que las rutas API respondan correctamente
-
-## Próximos Pasos
-
-1. **Testing**: Realizar pruebas funcionales de cada módulo
-2. **Documentación**: Crear manuales de usuario para cada módulo
-3. **Training**: Capacitar a los usuarios en el uso de los nuevos módulos
-4. **Monitoring**: Configurar monitoreo de errores y rendimiento
+- Confirma que las credenciales de base de datos en `backend/.env` sean válidas y que la base de datos exista.
+- Revisa la salida de `php backend/scripts/run_migrations.php` y los logs del backend antes de volver a ejecutar una migración.
+- Si faltan dependencias de frontend o backend, ejecuta `npm install` o `composer install` en su carpeta correspondiente.
+- Consulta [README.md](README.md) para los comandos y requisitos específicos vigentes.
